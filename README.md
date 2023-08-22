@@ -11,6 +11,7 @@
 
 ### ToDo
 
+- Forward all photos
 - Cache for message duplicates from different chats
 - Storing queries and target chats in database
 - Web-GUI chat selector
