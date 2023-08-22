@@ -1,0 +1,15 @@
+[Unit]
+Description=The service will check all new messages from the selected chats and forward important things to you
+After=network.target
+
+[Service]
+User=sirne
+Group=sirne
+Type=simple
+WorkingDirectory=/home/sirne/Telegram-important-notifies
+ExecStart=python3 main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
