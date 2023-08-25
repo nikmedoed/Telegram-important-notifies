@@ -12,7 +12,7 @@
 # How it Works
 
 # ToDo
-- [ ] Processing unreaded messages
+- [x] Processing unreaded messages
 - [ ] Resistance to the disappearance of the Internet
 - [x] Forward all photos
 - [ ] Storing queries and target chats in database
