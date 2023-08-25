@@ -7,10 +7,13 @@ import html
 import logging
 import traceback
 
-@client.on(events.NewMessage(chats=db.get_chats()))
+
 async def handle_new_message(event: events.newmessage.NewMessage.Event):
     try:
-        message = event.message
+        if hasattr(event, 'messages'):
+            message = event.messages[0]
+        else:
+            message = event.message
         chat_id = message.chat_id
 
         query = db.get_word_for_chat(chat_id)
@@ -30,13 +33,26 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event):
                 f"<a href='{html.escape(message_link)}'>Сообщение</a>"
             )
             await client.send_message(TARGET_USER, infomes)
-            await message.forward_to(TARGET_USER)
-            logging.info(f"{chat_id} {chat} :: {res} :: \n{trep[:64]}...")
+            await event.forward_to(TARGET_USER)
+            logging.info(f"{chat_id} {chat} :: {res} :: {trep[:64]}...")
         else:
-            logging.info(f"Skipped :: {chat_id} :: {chat} :: {trep[:50]}...")
+            logging.info(f"Skipped :: {chat_id} :: {chat} :: mid:{message.id} :: {trep}")
     except Exception as e:
         logging.error(f"Ошибка обработки сообщения: {e.__class__}: {e}\n"
                       f"{traceback.print_exc()}")
+
+
+@client.on(events.Album(chats=db.get_chats()))
+async def handle_album(event):
+    await handle_new_message(event)
+
+
+@client.on(events.NewMessage(chats=db.get_chats(), incoming=True))
+async def handle_single(event):
+    if (hasattr(event, 'message')
+            and hasattr(event.message, 'groupped_id')
+            and not event.message.groupped_id):
+        await handle_new_message(event)
 
 
 async def notify(text):

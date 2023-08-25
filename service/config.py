@@ -24,7 +24,8 @@ TARGET_USER = client.get_entity(TARGET_USER)
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    # format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+    format="%(levelname)s:%(name)s - %(message)s",
 )
 
 NLTK_LANGUAGE = os.getenv('NLTK_LANGUAGE')
