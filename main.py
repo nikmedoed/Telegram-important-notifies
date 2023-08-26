@@ -14,8 +14,10 @@ async def handle_album(event):
 @client.on(events.NewMessage(chats=db.get_chats(), incoming=True))
 async def handle_single(event):
     if (hasattr(event, 'message')
-            and hasattr(event.message, 'groupped_id')
-            and not event.message.groupped_id):
+            and (
+                    not hasattr(event.message, 'groupped_id')
+                    or (hasattr(event.message, 'groupped_id')
+                        and not event.message.groupped_id))):
         await handle_new_message(event)
 
 
