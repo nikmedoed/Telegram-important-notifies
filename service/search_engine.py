@@ -2,6 +2,22 @@ from rapidfuzz import fuzz
 from nltk.tokenize import word_tokenize
 from service.config import stop_words
 from service.cache import cache
+import string
+import pymorphy2
+
+# Создайте объекты для морфологического анализа для английского и русского
+morph_en = pymorphy2.MorphAnalyzer()
+morph_ru = pymorphy2.MorphAnalyzer(lang='ru')
+
+
+def normalize(word):
+    if word.isalpha():
+        if word.isascii():
+            normalized_word = morph_en.parse(word)[0].normal_form
+        else:
+            normalized_word = morph_ru.parse(word)[0].normal_form
+        return normalized_word
+    return word
 
 
 def tokenize(text):
@@ -10,7 +26,9 @@ def tokenize(text):
     if res:
         return res
     text_tokens = word_tokenize(text)
-    text_tokens = [word for word in text_tokens if word not in stop_words]
+    text_tokens = [normalize(word)
+                   for word in text_tokens if (word not in stop_words
+                                               and word not in string.punctuation)]
     cache.set(text, text_tokens)
     return text_tokens
 
@@ -27,7 +45,7 @@ def find_phrase(query, text):
             if similarity > 85:
                 positions.append(i)
                 total_similarity += similarity
-                continue
+                break
         # Учёт расстояния между словами
         if len(positions) > 1:
             positions.sort()
@@ -43,7 +61,7 @@ def find_queries(queries, text):
     res = {}
     for query in queries:
         results = find_phrase(query, text)
-        if results > 50:
+        if results > 55:
             res[query] = round(results, 2)
     return res
 
