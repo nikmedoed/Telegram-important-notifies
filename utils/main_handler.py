@@ -1,14 +1,15 @@
 import html
 import logging
 import traceback
-
-from telethon import events
-
 from service import db
 from service.config import client, TARGET_USER
 from service.search_engine import find_queries
 from service.utils import get_chat_name, get_message_source_link
 from telethon.tl import types
+from telethon import events
+import asyncio
+
+message_mutex = asyncio.Lock()
 
 
 async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_func=None):
@@ -39,11 +40,12 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
                 f"{scores}\n\n"
                 f"<a href='{html.escape(message_link)}'>Сообщение</a>"
             )
-            await client.send_message(TARGET_USER, infomes)
-            if not forward_func:
-                await event.forward_to(TARGET_USER)
-            else:
-                await forward_func()
+            async with message_mutex:
+                await client.send_message(TARGET_USER, infomes)
+                if not forward_func:
+                    await event.forward_to(TARGET_USER)
+                else:
+                    await forward_func()
             logging.info(f"{chat_id} {chat} :: {res} :: {trep[:64]}...")
         else:
             logging.info(f"Skipped :: {chat_id} :: {chat} :: mid:{message.id} :: {trep}")

@@ -13,7 +13,7 @@
 
 # ToDo
 - [x] Processing unreaded messages
-  - [ ] Simultaneous sending of info message and forwarding (mutex)
+  - [x] Simultaneous sending of info message and forwarding (mutex)
 - [ ] Resistance to the disappearance of the Internet
 - [x] Forward all photos
 - [ ] Storing queries and target chats in database
