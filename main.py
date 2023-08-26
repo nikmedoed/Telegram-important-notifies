@@ -2,8 +2,8 @@ from telethon.sync import events
 from service import db
 from service.config import client, TARGET_USER
 import logging
-from utils.main_handler import handle_new_message
-from utils.process_history import process_unread_messages
+from service.main_handler import handle_new_message
+from service.process_history import process_unread_messages
 
 
 @client.on(events.Album(chats=db.get_chats()))
