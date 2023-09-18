@@ -3,11 +3,11 @@ from nltk.tokenize import word_tokenize
 from service.config import stop_words
 from service.cache import cache
 import string
-import pymorphy2
+import pymorphy3
 
 # Создайте объекты для морфологического анализа для английского и русского
-morph_en = pymorphy2.MorphAnalyzer()
-morph_ru = pymorphy2.MorphAnalyzer(lang='ru')
+morph_en = pymorphy3.MorphAnalyzer()
+morph_ru = pymorphy3.MorphAnalyzer(lang='ru')
 
 
 def normalize(word):
