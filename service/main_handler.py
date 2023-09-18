@@ -41,11 +41,14 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
                 f"<a href='{html.escape(message_link)}'>Сообщение</a>"
             )
             async with message_mutex:
-                await client.send_message(TARGET_USER, infomes)
+                # await client.send_message(TARGET_USER, infomes)
                 if not forward_func:
-                    await event.forward_to(TARGET_USER)
+                    message = await event.forward_to(TARGET_USER)
                 else:
-                    await forward_func()
+                    message = await forward_func()
+                if isinstance(message, list):
+                    message = message[0]
+                await message.reply(infomes)
             logging.info(f"{chat_id} {chat} :: {res} :: {trep[:64]}...")
         else:
             logging.info(f"Skipped :: {chat_id} :: {chat} :: mid:{message.id} :: {trep}")
