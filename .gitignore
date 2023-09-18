@@ -52,3 +52,4 @@ docs/_build/
 .idea
 service/channel_watcher.session
 utils/serach_engine_test.py
+service/channel_watcher.session-journal

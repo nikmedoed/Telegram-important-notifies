@@ -10,8 +10,8 @@ from service.main_handler import handle_new_message
 # unreaded_count = result.dialogs[0].unread_count
 
 async def analyse(messages):
-    async def fwd():
-        await client.forward_messages(TARGET_USER, messages)
+    def fwd():
+        return client.forward_messages(TARGET_USER, messages)
 
     if messages:
         await handle_new_message(
@@ -34,19 +34,15 @@ async def get_unread_messages(chat_id):
             min_id=read_inbox_max_id,
             reverse=True
     ):
-        if hasattr(message, "grouped_id"):
-            if group_id == message.grouped_id:
-                group.append(message)
-            else:
-                await analyse(group)
-                group = [message]
-                group_id = message.grouped_id
-        elif group:
-            await analyse(group)
-            group = []
-            group_id = -1
+        if not hasattr(message, "grouped_id") :
+            message.grouped_id = None
+        if group_id == message.grouped_id:
+            group.append(message)
         else:
-            await analyse(message)
+            await analyse(group)
+            group = [message]
+            group_id = message.grouped_id or -1
+    await analyse(group)
 
 
 async def process_unread_messages():
