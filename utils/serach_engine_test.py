@@ -27,4 +27,6 @@ if __name__ == "__main__":
             print("\n".join(res))
             print()
         else:
+            print(f">>Removed\n"
+                  f"{text}")
             os.remove(fpath)

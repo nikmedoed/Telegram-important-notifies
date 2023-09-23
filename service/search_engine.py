@@ -4,6 +4,7 @@ from service.nltk_init import stop_words
 from service.cache import cache
 import string
 import pymorphy3
+from nltk.tokenize import sent_tokenize
 
 # Создайте объекты для морфологического анализа для английского и русского
 morph_en = pymorphy3.MorphAnalyzer()
@@ -34,27 +35,35 @@ def tokenize(text):
 
 
 def find_phrase(query, text):
-    query_tokens = tokenize(query)
-    text_tokens = tokenize(text)
+    sentences = sent_tokenize(text)
+    max_similarity = 0
 
-    total_similarity = 0
-    positions = []
-    for query_token in query_tokens:
-        for i, text_token in enumerate(text_tokens):
-            similarity = fuzz.ratio(query_token, text_token)
-            if similarity > 85:
-                positions.append(i)
-                total_similarity += similarity
-                break
-        # Учёт расстояния между словами
-        if len(positions) > 1:
-            positions.sort()
-            ltt = len(text_tokens)
-            s = 0
-            for i in range(1, len(positions)):
-                s += positions[i] - positions[i - 1] - 2
-            total_similarity *= (ltt - (s / (len(positions) - 1))) / ltt
-    return total_similarity / len(query_tokens)
+    for sentence in sentences:
+        query_tokens = tokenize(query)
+        sentence_tokens = tokenize(sentence)
+
+        total_similarity = 0
+        positions = []
+        for query_token in query_tokens:
+            for i, text_token in enumerate(sentence_tokens):
+                similarity = fuzz.ratio(query_token, text_token)
+                if similarity > 85:
+                    positions.append(i)
+                    total_similarity += similarity
+                    break
+            # Учёт расстояния между словами
+            if len(positions) > 1:
+                positions.sort()
+                ltt = len(sentence_tokens)
+                s = 0
+                for i in range(1, len(positions)):
+                    s += positions[i] - positions[i - 1] - 2
+                total_similarity *= (ltt - (s / (len(positions) - 1))) / ltt
+
+        # Обновляем максимальное значение сходства, если текущее предложение имеет большее значение
+        max_similarity = max(max_similarity, total_similarity / len(query_tokens))
+
+    return max_similarity
 
 
 def find_queries(queries, text):
