@@ -1,6 +1,6 @@
 from rapidfuzz import fuzz
 from nltk.tokenize import word_tokenize
-from service.config import stop_words
+from service.nltk_init import stop_words
 from service.cache import cache
 import string
 import pymorphy3

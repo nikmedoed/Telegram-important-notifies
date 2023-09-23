@@ -50,6 +50,5 @@ coverage.xml
 docs/_build/
 .env
 .idea
-service/channel_watcher.session
-utils/serach_engine_test.py
-service/channel_watcher.session-journal
+channel_watcher.session
+channel_watcher.session-journal
