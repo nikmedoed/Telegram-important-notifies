@@ -4,3 +4,4 @@ pymorphy3==1.2.1
 python-dotenv==1.0.0
 rapidfuzz==2.4.2
 Telethon==1.29.3
+asyncio~=3.4.3

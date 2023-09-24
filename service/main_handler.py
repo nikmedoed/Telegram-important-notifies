@@ -10,9 +10,11 @@ from telethon import events
 import asyncio
 import hashlib
 from service.cache import Cache
+from rapidfuzz import fuzz
 
 message_mutex = asyncio.Lock()
 duplicate_cache = Cache(60 * 60 * 12)
+advanced_duplicate_cache = Cache(60 * 15)
 
 
 async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_func=None):
@@ -24,6 +26,7 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         else:
             messages = event
 
+        messages_count = len(messages) if isinstance(messages, list) else 1
         message = messages[0] if isinstance(messages, list) else messages
         chat_id = message.chat_id
         query = db.get_word_for_chat(chat_id)
@@ -38,11 +41,29 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         trep = text.replace('\n', '|')
         skip_info = f"{mess_info} :: {trep}"
 
+        sender_id = message.sender_id if message.sender_id else message.chat_id
+        cache_key = f"{sender_id}_{messages_count}"
+
         message_hash = hashlib.sha256(text.encode()).hexdigest()
-        if duplicate_cache.get(message_hash):
+        is_duplicate = duplicate_cache.get(message_hash)
+        duplicate_cache.set(message_hash, True)
+
+        previous_message = advanced_duplicate_cache.get(cache_key)
+        previous_message_length = len(previous_message) if previous_message else 0
+        advanced_duplicate_cache.set(cache_key, text)
+
+        if is_duplicate:
             logging.info(f"Duplicate skipped :: {skip_info}")
             return
-        duplicate_cache.set(message_hash, True)
+
+        if previous_message_length:
+            length_difference = abs(previous_message_length - len(text))
+            percentage_difference = 100 * length_difference / previous_message_length
+            if percentage_difference <= 10:
+                similarity = fuzz.token_sort_ratio(text, previous_message)
+                if similarity > 93:
+                    logging.info(f"Duplicate by similarity ({similarity:.1f}) :: {skip_info}")
+                    return
 
         res = find_queries(query, text)
         if not res:
