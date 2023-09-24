@@ -1,15 +1,14 @@
 from rapidfuzz import fuzz
 from nltk.tokenize import word_tokenize
 from service.nltk_init import stop_words
-from service.cache import cache
+from service.cache import Cache
 import string
 import pymorphy3
 from nltk.tokenize import sent_tokenize
 
-# Создайте объекты для морфологического анализа для английского и русского
 morph_en = pymorphy3.MorphAnalyzer()
 morph_ru = pymorphy3.MorphAnalyzer(lang='ru')
-
+cache = Cache(60*60*24)
 
 def normalize(word):
     if word.isalpha():
