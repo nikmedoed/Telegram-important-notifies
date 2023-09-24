@@ -10,13 +10,24 @@
 6. Edit `dosc/tg_notifies.service` for your user and copy to systemd, enable and start
 
 # How it Works
+**Configuration**:
+- Define the recipient for forwarded messages.
+- Specify the chats to monitor.
+- Specify queries to search within messages.
+
+**Functionality**:
+- Upon initialization, the bot will scan and process all unread messages in the selected chats.
+- It continuously monitors and processes incoming messages.
+- After processing, messages are marked as read.
+- If a message matches a predefined query, the bot forwards it to the specified recipient with a notification of the match.
 
 # ToDo
 - [x] Processing unreaded messages
   - [x] Simultaneous sending of info message and forwarding (mutex)
-- [ ] Resistance to the disappearance of the Internet
 - [x] Forward all photos
+- [ ] Flexible query combinations for different chats (queries for a specific chat)
 - [ ] Storing queries and target chats in database
 - [ ] Web-GUI for chat selecting and queries settings
-- [ ] Flexible query combinations for different chats (queries for a specific chat)
-- [ ] Caching messages for duplicates detecting (from different chats etc.)
+- [x] Caching messages for duplicates detecting (from different chats etc.)
+- [ ] Resistance to the disappearance of the Internet
+- [ ] Emprove search engine by Word2Vec
