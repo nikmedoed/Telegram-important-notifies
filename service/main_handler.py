@@ -45,15 +45,15 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         cache_key = f"{sender_id}_{messages_count}"
 
         message_hash = hashlib.sha256(text.encode()).hexdigest()
-        is_duplicate = duplicate_cache.get(message_hash)
-        duplicate_cache.set(message_hash, True)
+        previous_messages_count = duplicate_cache.get(message_hash)
+        duplicate_cache.set(message_hash, messages_count)
 
         previous_message = advanced_duplicate_cache.get(cache_key)
         previous_message_length = len(previous_message) if previous_message else 0
         advanced_duplicate_cache.set(cache_key, text)
 
-        if is_duplicate:
-            logging.info(f"Duplicate skipped :: {skip_info}")
+        if previous_messages_count == messages_count:
+            logging.info(f"Duplicate skipped mc {messages_count} :: {skip_info}")
             return
 
         if previous_message_length:

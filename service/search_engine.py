@@ -50,7 +50,6 @@ def find_phrase(query, text):
                     positions.append(i)
                     total_similarity += similarity
                     break
-            # Учёт расстояния между словами
             if len(positions) > 1:
                 positions.sort()
                 ltt = len(sentence_tokens)
@@ -59,7 +58,6 @@ def find_phrase(query, text):
                     s += positions[i] - positions[i - 1] - 2
                 total_similarity *= (ltt - (s / (len(positions) - 1))) / ltt
 
-        # Обновляем максимальное значение сходства, если текущее предложение имеет большее значение
         max_similarity = max(max_similarity, total_similarity / len(query_tokens))
 
     return max_similarity
