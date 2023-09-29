@@ -1,26 +1,16 @@
-def get_chats():
-    return {
-        -1001844767026,
-        -1001628122702,
-        -1001820749278,
-        -1001627327716,
-        -1001805296788
+from service.data_dir import data_directory
+import os
 
-        ,
-        77966866,
-        -1001782006999,
-        -1001333307219,
-        -947180506,
-        -1001981597590
-    }
+with open(os.path.join(data_directory, "chats"), 'r', encoding="utf8") as f:
+    _chats = set([int(i) for i in f.read().split() if i])
+
+with open(os.path.join(data_directory, "queries"), 'r', encoding="utf8") as f:
+    _queries = set(line.strip() for line in f if line.strip())
+
+
+def get_chats():
+    return _chats
 
 
 def get_word_for_chat(chat_id):
-    return {
-        "Увлажнитель",
-        "Микроволновка",
-        "Компьютерный стул",
-        "Офисный стул",
-        "Портативный монитор",
-        "Микроволновая печь",
-    }
+    return _queries

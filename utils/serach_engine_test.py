@@ -1,15 +1,10 @@
 from service.search_engine import find_phrase
 import os
 from service.data_dir import data_directory
+from service.db import get_word_for_chat
 
 if __name__ == "__main__":
-    queries = {
-        "Портативный монитор",
-        "Увлажнитель",
-        "Микроволновка",
-        "Компьютерный стул",
-        "Офисный стул",
-    }
+    queries = get_word_for_chat(1)
     messages_directory = os.path.join(data_directory, "messages")
 
     for message in os.listdir(messages_directory):
