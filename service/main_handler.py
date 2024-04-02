@@ -52,7 +52,7 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         previous_message_length = len(previous_message) if previous_message else 0
         advanced_duplicate_cache.set(cache_key, text)
 
-        if previous_messages_count == messages_count:
+        if previous_messages_count:
             logging.info(f"Duplicate skipped mc {messages_count} :: {skip_info}")
             return
 
