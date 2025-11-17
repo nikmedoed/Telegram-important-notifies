@@ -1,6 +1,6 @@
 import logging
 import traceback
-from service import db
+from service.db import db
 from telethon import functions
 from service.config import client, TARGET_USER
 from service.main_handler import handle_new_message
@@ -46,7 +46,7 @@ async def get_unread_messages(chat_id):
 
 
 async def process_unread_messages():
-    chats_to_process = db.get_chats()
+    chats_to_process = db.get_tracked_chat_ids()
     me = await client.get_me()
     me = {me.id, TARGET_USER.id}
     for chat in chats_to_process:

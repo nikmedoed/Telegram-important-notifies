@@ -1,0 +1,113 @@
+{% macro channel_datatable(
+  table_id,
+  channels,
+  include_checkbox=False,
+  checkbox_name='channel_ids',
+  checked_ids=None,
+  include_groups=False,
+  channel_groups_map=None,
+  include_links=False,
+  link_username=False,
+  show_kind=False,
+  type_labels=None,
+  empty_text='Нет данных.',
+  per_page=None,
+  searchable=True,
+  datatable_config=None,
+  table_class=''
+) %}
+  {% set checked_values = checked_ids or [] %}
+  {% set labels = type_labels or {
+    'channel': 'Канал',
+    'supergroup': 'Супергруппа',
+    'gigagroup': 'Гигагруппа',
+    'chat': 'Чат',
+    'unknown': 'Неизвестно'
+  } %}
+  {% set classes = ['datatable'] %}
+  {% if table_class %}{% set classes = classes + [table_class] %}{% endif %}
+  <table id="{{ table_id }}"
+         class="{{ classes|join(' ') }}"
+         data-datatable="true"
+         {% if per_page %}data-datatable-per-page="{{ per_page }}"{% endif %}
+         {% if not searchable %}data-datatable-search="false"{% endif %}
+         {% if datatable_config %}data-datatable-config='{{ datatable_config }}'{% endif %}
+         {% if include_checkbox %}data-datatable-checkbox-name="{{ checkbox_name }}"{% endif %}>
+    <thead>
+      <tr>
+        {% if include_checkbox %}<th class="checkbox-cell" data-sortable="false" data-searchable="false"></th>{% endif %}
+        <th>Название</th>
+        <th>Username</th>
+        <th>ID</th>
+        {% if show_kind %}<th>Тип</th>{% endif %}
+        {% if include_groups %}<th>Группы</th>{% endif %}
+        {% if include_links %}<th>Ссылка</th>{% endif %}
+      </tr>
+    </thead>
+    <tbody>
+    {% if channels %}
+      {% for channel in channels %}
+        {% set channel_groups = channel_groups_map.get(channel.id, []) if include_groups and channel_groups_map is not none else [] %}
+        <tr>
+          {% if include_checkbox %}
+            <td class="checkbox-cell">
+              <input type="checkbox"
+                     name="{{ checkbox_name }}"
+                     value="{{ channel.id }}"
+                     {% if channel.id in checked_values %}checked{% endif %}>
+            </td>
+          {% endif %}
+          <td><a class="table-link" href="/channels/{{ channel.id }}">{{ channel.title }}</a></td>
+          <td>
+            {% if channel.username %}
+              {% if link_username %}
+                <a class="table-link" href="https://t.me/{{ channel.username }}" target="_blank">@{{ channel.username }}</a>
+              {% else %}
+                @{{ channel.username }}
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td><code>{{ channel.id }}</code></td>
+          {% if show_kind %}
+            {% set kind = channel.kind or 'unknown' %}
+            <td>{{ labels.get(kind, kind) }}</td>
+          {% endif %}
+          {% if include_groups %}
+            <td>
+              {% if channel_groups %}
+                {% for group in channel_groups %}
+                  <a class="table-link" href="/groups/{{ group.id }}">{{ group.title }}</a>{% if not loop.last %}, {% endif %}
+                {% endfor %}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          {% endif %}
+          {% if include_links %}
+            <td>
+              {% if channel.invite_link %}
+                <a href="{{ channel.invite_link }}" target="_blank">Перейти</a>
+              {% elif channel.username %}
+                <a href="https://t.me/{{ channel.username }}" target="_blank">Перейти</a>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr>
+        {% set colspan = 3
+          + (1 if include_checkbox else 0)
+          + (1 if show_kind else 0)
+          + (1 if include_groups else 0)
+          + (1 if include_links else 0) %}
+        <td colspan="{{ colspan }}">{{ empty_text }}</td>
+      </tr>
+    {% endif %}
+    </tbody>
+  </table>
+{% endmacro %}

@@ -1,0 +1,71 @@
+{% extends "base.jinja2" %}
+{% import "components/channel_blocks.jinja2" as channel_blocks %}
+{% import "components/channel_table.jinja2" as channel_table %}
+{% import "components/query_blocks.jinja2" as query_blocks %}
+
+{% block content %}
+<section class="card">
+  <h2>Редактировать группу</h2>
+  <form method="post" action="/groups/{{ group.id }}">
+    <label for="title">Название</label>
+    <input type="text" id="title" name="title" value="{{ group.title }}" required>
+    <label for="description">Описание</label>
+    <textarea id="description" name="description" rows="2">{{ group.description or '' }}</textarea>
+    <div class="actions">
+      <button type="submit">Сохранить</button>
+      <a class="button-link" href="/groups">Назад</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Каналы</h2>
+  {% set has_channels = (selected_channels|length + available_channels|length) > 0 %}
+  {% if not has_channels %}
+    <p>Список каналов пуст. Обновите его на странице «Каналы».</p>
+  {% else %}
+    <form method="post" action="/groups/{{ group.id }}/channels">
+      {{ channel_blocks.channel_section("Выбранные каналы", selected_channels, checked=True) }}
+      <h3>Доступные каналы</h3>
+      {{ channel_table.channel_datatable(
+        "group-available-channels",
+        available_channels,
+        include_checkbox=True,
+        link_username=True
+      ) }}
+
+      <div class="form-actions">
+        <button type="submit">Обновить состав</button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Запросы для группы</h2>
+  {% if not has_channels %}
+    <p>Добавьте каналы в группу, чтобы управлять запросами.</p>
+  {% elif not queries_info %}
+    <p>Запросы ещё не добавлены.</p>
+  {% else %}
+    <form method="post" action="/groups/{{ group.id }}/queries">
+      <div class="channel-list">
+        {% for entry in queries_info %}
+          {% set meta_text = "На каналах группы: " ~ entry.assigned_count ~ " из " ~ (assigned_channels|length) %}
+          {{ query_blocks.query_checkbox(
+            entry.query,
+            meta_text=meta_text,
+            checked=entry.is_selected,
+            wrapper_class="group-query-item",
+            is_partial=entry.is_partial
+          ) }}
+        {% endfor %}
+      </div>
+      <div class="form-actions">
+        <button type="submit">Применить к группе</button>
+      </div>
+    </form>
+    <p class="hint">Установка галочки создаёт связи для всех каналов группы. После сохранения отдельные каналы можно исключать вручную.</p>
+  {% endif %}
+</section>
+{% endblock %}

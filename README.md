@@ -25,9 +25,9 @@
 - [x] Processing unreaded messages
   - [x] Simultaneous sending of info message and forwarding (mutex)
 - [x] Forward all photos
-- [ ] Flexible query combinations for different chats (queries for a specific chat)
-- [ ] Storing queries and target chats in database
-- [ ] Web-GUI for chat selecting and queries settings
+- [x] Flexible query combinations for different chats (queries for a specific chat)
+- [x] Storing queries and target chats in database
+- [x] Web-GUI for chat selecting and queries settings
 - [x] Caching messages for duplicates detecting (from different chats etc.)
 - [ ] Resistance to the disappearance of the Internet
 - [ ] Emprove search engine by Word2Vec

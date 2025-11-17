@@ -1,5 +1,4 @@
-from service.config import client
-from service.data_dir import data_directory
+from service.config import client, data_directory
 import hashlib
 import os
 

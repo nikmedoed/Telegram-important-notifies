@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="{{ static('style.css') }}">
+  <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" type="text/css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header>
+    <div class="brand">Telegram watcher</div>
+    <nav>
+      <a href="/">Запросы</a>
+      <a href="/groups">Группы</a>
+      <a href="/channels">Каналы</a>
+    </nav>
+  </header>
+  <main>
+    {% if message %}
+      <div class="flash">{{ message }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" type="text/javascript"></script>
+  <script>
+  (function () {
+    const parseJSON = (value, fallback) => {
+      if (!value) return fallback;
+      try { return JSON.parse(value); } catch (_) { return fallback; }
+    };
+
+    const getColumns = (table) => {
+      return Array.from(table.querySelectorAll("thead th"))
+        .map((th, index) => {
+          const column = { select: index };
+          let hasOptions = false;
+          if (th.dataset.sortable === "false") {
+            column.sortable = false;
+            hasOptions = true;
+          }
+          if (th.dataset.searchable === "false") {
+            column.searchable = false;
+            hasOptions = true;
+          }
+          if (th.dataset.filter) {
+            column.filter = th.dataset.filter.split(",").map((v) => v.trim()).filter(Boolean);
+            hasOptions = true;
+          }
+          return hasOptions ? column : null;
+        })
+        .filter(Boolean);
+    };
+
+    const syncCheckboxes = (table, dataTable) => {
+      const checkboxName = table.dataset.datatableCheckboxName;
+      if (!checkboxName) {
+        return;
+      }
+      const selector = `input[type="checkbox"][name="${checkboxName}"]`;
+      const selected = new Set(
+        Array.from(table.querySelectorAll(selector))
+          .filter((input) => input.checked)
+          .map((input) => input.value)
+      );
+      const apply = () => {
+        table.querySelectorAll(selector).forEach((input) => {
+          input.checked = selected.has(input.value);
+        });
+      };
+      table.addEventListener("change", (event) => {
+        if (!event.target || !event.target.matches(selector)) {
+          return;
+        }
+        if (event.target.checked) {
+          selected.add(event.target.value);
+        } else {
+          selected.delete(event.target.value);
+        }
+      });
+      ["datatable.page", "datatable.sort", "datatable.search", "datatable.refresh"].forEach((evt) => {
+        dataTable.on(evt, apply);
+      });
+      apply();
+    };
+
+    const initTable = (table) => {
+      if (table.dataset.datatableInitialized === "true") {
+        return;
+      }
+      const options = {
+        searchable: table.dataset.datatableSearch !== "false",
+        perPage: table.dataset.datatablePerPage ? parseInt(table.dataset.datatablePerPage, 10) : -1,
+        perPageSelect: table.dataset.datatablePerPageSelect
+          ? parseJSON(table.dataset.datatablePerPageSelect, false)
+          : false,
+      };
+      const columnConfig = getColumns(table);
+      if (columnConfig.length) {
+        options.columns = columnConfig;
+      }
+      const customConfig = parseJSON(table.getAttribute("data-datatable-config"), null);
+      const finalOptions = customConfig ? Object.assign({}, options, customConfig) : options;
+      const instance = new simpleDatatables.DataTable(table, finalOptions);
+      table.dataset.datatableInitialized = "true";
+      syncCheckboxes(table, instance);
+
+      if (table.dataset.datatableNoBottom === "true") {
+        const bottom = table.closest(".datatable-wrapper")?.querySelector(".datatable-bottom");
+        bottom?.remove();
+      }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (!window.simpleDatatables) {
+        return;
+      }
+      document.querySelectorAll("table[data-datatable], table.datatable").forEach(initTable);
+    });
+  })();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

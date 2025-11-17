@@ -1,0 +1,59 @@
+{% extends "base.jinja2" %}
+{% import "components/query_blocks.jinja2" as query_blocks %}
+
+{% block content %}
+<section class="card">
+  <h2>{{ channel.title }}</h2>
+  <dl class="channel-details">
+    <div><dt>ID</dt><dd><code>{{ channel.id }}</code></dd></div>
+    <div><dt>Username</dt><dd>{{ channel.username or '—' }}</dd></div>
+    <div><dt>Тип</dt><dd>{{ channel.kind or '—' }}</dd></div>
+    <div>
+      <dt>Ссылка</dt>
+      <dd>
+        {% if channel.invite_link %}
+          <a href="{{ channel.invite_link }}" target="_blank">Перейти в Telegram</a>
+        {% elif channel.username %}
+          <a href="https://t.me/{{ channel.username }}" target="_blank">Перейти в Telegram</a>
+        {% else %}
+          —
+        {% endif %}
+      </dd>
+    </div>
+    <div>
+      <dt>Группы</dt>
+      <dd>
+        {% if channel_groups %}
+          {% for group in channel_groups %}
+            <a class="table-link" href="/groups/{{ group.id }}">{{ group.title }}</a>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}
+          —
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+  <div class="actions">
+    <a class="button-link" href="/channels">Назад к списку</a>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Запросы</h3>
+  {% if not queries %}
+    <p>Запросы ещё не добавлены. Создайте их на главной странице.</p>
+  {% else %}
+    <form method="post" action="/channels/{{ channel.id }}/queries">
+      <div class="channel-list">
+        {% for query in queries %}
+          {% set meta_text = "ID: " ~ query.id ~ " · Каналов: " ~ query.channel_count %}
+          {{ query_blocks.query_checkbox(query, checked=(query.id in assigned_queries), meta_text=meta_text) }}
+        {% endfor %}
+      </div>
+      <div class="form-actions">
+        <button type="submit">Обновить связи</button>
+      </div>
+    </form>
+  {% endif %}
+</section>
+{% endblock %}

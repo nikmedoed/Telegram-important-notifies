@@ -1,0 +1,16 @@
+{% macro query_checkbox(query, checkbox_name='query_ids', checked=False, meta_text='', wrapper_class='', is_partial=False) %}
+  {% set class_name = 'channel-item' %}
+  {% if wrapper_class %}{% set class_name = class_name + ' ' + wrapper_class %}{% endif %}
+  {% if is_partial %}{% set class_name = class_name + ' partial' %}{% endif %}
+  <label class="{{ class_name }}">
+    <input type="checkbox" name="{{ checkbox_name }}" value="{{ query.id }}" {% if checked %}checked{% endif %}>
+    <div>
+      <div class="channel-title">
+        <a class="table-link" href="/queries/{{ query.id }}">{{ query.phrase }}</a>
+      </div>
+      {% if meta_text %}
+        <div class="channel-meta">{{ meta_text }}</div>
+      {% endif %}
+    </div>
+  </label>
+{% endmacro %}

@@ -1,0 +1,42 @@
+{% macro channel_checkbox(channel, checkbox_name='channel_ids', checked=False, show_groups=False, channel_groups_map=None, show_links=False, wrapper_class='') %}
+  {% set class_name = 'channel-item' + (' ' + wrapper_class if wrapper_class else '') %}
+  <label class="{{ class_name }}">
+    <input type="checkbox" name="{{ checkbox_name }}" value="{{ channel.id }}" {% if checked %}checked{% endif %}>
+    <div>
+      <div class="channel-title">
+        <a class="table-link" href="/channels/{{ channel.id }}">{{ channel.title }}</a>
+      </div>
+      <div class="channel-meta">
+        ID: {{ channel.id }}
+        {% if channel.username %} · @{{ channel.username }}{% endif %}
+        {% if show_groups %}
+          {% set channel_groups = channel_groups_map.get(channel.id, []) if channel_groups_map is not none else [] %}
+          {% if channel_groups %}
+            · Группы:
+            {% for group in channel_groups %}
+              <a class="table-link" href="/groups/{{ group.id }}">{{ group.title }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% endif %}
+        {% endif %}
+        {% if show_links %}
+          {% if channel.invite_link %}
+            · <a href="{{ channel.invite_link }}" target="_blank">ссылка</a>
+          {% elif channel.username %}
+            · <a href="https://t.me/{{ channel.username }}" target="_blank">ссылка</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </label>
+{% endmacro %}
+
+{% macro channel_section(title, channels, checkbox_name='channel_ids', checked=False, show_groups=False, channel_groups_map=None, show_links=False, wrapper_class='') %}
+  {% if channels %}
+    <h3>{{ title }}</h3>
+    <div class="channel-list">
+      {% for channel in channels %}
+        {{ channel_checkbox(channel, checkbox_name, checked, show_groups, channel_groups_map, show_links, wrapper_class) }}
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}

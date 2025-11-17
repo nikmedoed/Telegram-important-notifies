@@ -1,0 +1,280 @@
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    background: #f7f7f7;
+    color: #222;
+}
+
+header {
+    background: #20232a;
+    color: #fff;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header .brand {
+    font-weight: 700;
+}
+
+nav a {
+    color: #61dafb;
+    margin-right: 1rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+nav a:last-child {
+    margin-right: 0;
+}
+
+main {
+    padding: 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.card {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.card-header h2 {
+    margin: 0;
+}
+
+.card-header form {
+    margin-left: auto;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+}
+
+textarea,
+input[type="text"] {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 1rem;
+}
+
+button {
+    background: #20232a;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.6rem 1.25rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+button.secondary {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.actions,
+.form-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.flash {
+    background: #dff0d8;
+    color: #2d662d;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border: 1px solid #b2d8b2;
+}
+
+.channel-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.75rem;
+}
+
+.group-actions {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #fafafa;
+}
+
+.group-actions-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.group-actions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.group-chip {
+    border: 1px solid #d9d9d9;
+    border-radius: 8px;
+    padding: 0.75rem;
+    min-width: 230px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    background: #fff;
+}
+
+.chip-title {
+    font-weight: 600;
+}
+
+.chip-meta {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.chip-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.chip-buttons button {
+    padding: 0.35rem 0.75rem;
+}
+
+.channel-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    background: #fff;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.channel-item input {
+    margin-top: 0.4rem;
+}
+
+.channel-title {
+    font-weight: 600;
+}
+
+.channel-meta {
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.group-query-item.partial {
+    border-color: #f0c36d;
+    background: #fff9e6;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+th,
+td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+}
+
+.checkbox-cell {
+    width: 48px;
+    text-align: center;
+}
+
+.checkbox-cell input {
+    width: 1rem;
+    height: 1rem;
+}
+
+th {
+    background: #fafafa;
+    font-size: 0.9rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #666;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+form.inline {
+    display: inline;
+}
+
+a.button-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    text-decoration: none;
+    color: #20232a;
+    font-weight: 600;
+}
+
+.table-link {
+    color: #20232a;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.table-link:hover,
+.table-link:focus {
+    text-decoration: underline;
+}
+
+.channel-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.5rem 1rem;
+    margin: 1rem 0;
+}
+
+.channel-details dt {
+    font-weight: 600;
+    color: #555;
+}
+
+.channel-details dd {
+    margin: 0.2rem 0 0;
+}
+
+.channel-details div {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.hint {
+    font-size: 0.85rem;
+    color: #555;
+}

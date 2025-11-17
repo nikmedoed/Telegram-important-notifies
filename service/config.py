@@ -3,8 +3,7 @@ from dotenv import load_dotenv
 from telethon.sync import TelegramClient
 import logging
 
-from service.data_dir import data_directory
-
+data_directory = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 session = os.path.join(data_directory, 'channel_watcher.session')
 
 load_dotenv()

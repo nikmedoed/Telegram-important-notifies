@@ -1,0 +1,51 @@
+{% extends "base.jinja2" %}
+
+{% block content %}
+    <section class="card">
+        <h2>Добавить группу каналов</h2>
+        <form method="post" action="/groups">
+            <label for="title">Название</label>
+            <input type="text" id="title" name="title" required>
+            <label for="description">Описание</label>
+            <textarea id="description" name="description" rows="2"></textarea>
+            <div class="form-actions">
+                <button type="submit">Создать</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="card">
+        <h2>Группы</h2>
+        {% if not groups %}
+            <p>Группы ещё не добавлены.</p>
+        {% else %}
+            <table id="groups-table" class="datatable" data-datatable="true">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Каналов</th>
+                    <th>Описание</th>
+                    <th data-sortable="false" data-searchable="false">Действия</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for group in groups %}
+                    <tr>
+                        <td><code>{{ group.id }}</code></td>
+                        <td><a class="table-link" href="/groups/{{ group.id }}">{{ group.title }}</a></td>
+                        <td>{{ group.channel_count }}</td>
+                        <td>{{ group.description or '—' }}</td>
+                        <td class="actions">
+                            <form class="inline" method="post" action="/groups/{{ group.id }}/delete"
+                                  onsubmit="return confirm('Удалить группу?');">
+                                <button class="secondary" type="submit">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+{% endblock %}

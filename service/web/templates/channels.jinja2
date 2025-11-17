@@ -1,0 +1,21 @@
+{% extends "base.jinja2" %}
+{% import "components/channel_table.jinja2" as channel_table %}
+
+{% block content %}
+    <section class="card">
+        <div class="card-header">
+            <h2>Список каналов</h2>
+            <form method="post" action="/channels/refresh">
+                <button type="submit">Обновить из Telegram</button>
+            </form>
+        </div>
+        {{ channel_table.channel_datatable(
+            "channels-table",
+            channels,
+            include_groups=True,
+            channel_groups_map=channel_groups_map,
+            show_kind=True,
+            link_username=True
+        ) }}
+    </section>
+{% endblock %}

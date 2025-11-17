@@ -1,7 +1,7 @@
 import html
 import logging
 import traceback
-from service import db
+from service.db import db
 from service.config import client, TARGET_USER
 from service.search_engine import find_queries
 from service.utils import get_chat_name, get_message_source_link
@@ -29,7 +29,9 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         messages_count = len(messages) if isinstance(messages, list) else 1
         message = messages[0] if isinstance(messages, list) else messages
         chat_id = message.chat_id
-        query = db.get_word_for_chat(chat_id)
+        queries = db.get_queries_for_chat(chat_id)
+        if not queries:
+            return
         chat = await get_chat_name(message)
 
         mess_info = f"{chat_id} :: {chat} :: mid:{message.id}"
@@ -65,7 +67,7 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
                     logging.info(f"Duplicate by similarity ({similarity:.1f}) :: {skip_info}")
                     return
 
-        res = find_queries(query, text)
+        res = find_queries(queries, text)
         if not res:
             logging.info(f"Skipped :: {skip_info}")
             return

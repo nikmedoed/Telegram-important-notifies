@@ -1,0 +1,95 @@
+{% extends "base.jinja2" %}
+{% import "components/channel_blocks.jinja2" as channel_blocks %}
+{% import "components/channel_table.jinja2" as channel_table %}
+
+{% block content %}
+<section class="card">
+  <h2>Редактировать запрос</h2>
+  <form method="post" action="/queries/{{ query.id }}">
+    <label for="phrase">Текст</label>
+    <textarea id="phrase" name="phrase" rows="3" required>{{ query.phrase }}</textarea>
+    <div class="actions">
+      <button type="submit">Сохранить</button>
+      <a class="button-link" href="/">Назад</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Каналы</h2>
+  <p>Назначено каналов: {{ query.channel_count }}</p>
+  {% set has_channels = (selected_channels|length + available_channels|length) > 0 %}
+  {% if not has_channels %}
+    <p>Список каналов пуст. Обновите его на странице «Каналы».</p>
+  {% else %}
+    {% if groups %}
+      <div class="group-actions">
+        <div class="group-actions-title">Группы:</div>
+        <div class="group-actions-list">
+        {% for group in groups %}
+          {% set member_ids = group_memberships.get(group.id, []) %}
+          <div class="group-chip">
+            <div>
+              <div class="chip-title">{{ group.title }}</div>
+              <div class="chip-meta">{{ group.channel_count }} каналов</div>
+            </div>
+            <div class="chip-buttons">
+              <button type="button" class="secondary" data-group-action="select" data-channel-ids="{{ member_ids|join(',') }}" {% if not member_ids %}disabled{% endif %}>Выбрать</button>
+              <button type="button" class="secondary" data-group-action="clear" data-channel-ids="{{ member_ids|join(',') }}" {% if not member_ids %}disabled{% endif %}>Снять</button>
+            </div>
+          </div>
+        {% endfor %}
+        </div>
+        <p class="hint">Кнопки отмечают или снимают все каналы группы в списке ниже — после этого сохраните форму.</p>
+      </div>
+    {% endif %}
+    <form method="post" action="/queries/{{ query.id }}/channels">
+      {{ channel_blocks.channel_section(
+        "Выбранные каналы",
+        selected_channels,
+        checked=True,
+        show_groups=True,
+        channel_groups_map=channel_groups_map,
+        show_links=True
+      ) }}
+      <h3>Доступные каналы</h3>
+      {{ channel_table.channel_datatable(
+        "query-available-channels",
+        available_channels,
+        include_checkbox=True,
+        include_groups=True,
+        channel_groups_map=channel_groups_map,
+        link_username=True
+      ) }}
+
+      <div class="form-actions">
+        <button type="submit">Обновить связи</button>
+      </div>
+    </form>
+  {% endif %}
+  <p class="hint">Список каналов обновляется на отдельной странице.</p>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll("[data-group-action]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const idsRaw = btn.getAttribute("data-channel-ids") || "";
+      if (!idsRaw) {
+        return;
+      }
+      const action = btn.getAttribute("data-group-action");
+      const channelIds = idsRaw.split(",").map(function (value) { return value.trim(); }).filter(Boolean);
+      channelIds.forEach(function (channelId) {
+        const checkbox = document.querySelector('input[name="channel_ids"][value="' + channelId + '"]');
+        if (checkbox) {
+          checkbox.checked = action === "select";
+        }
+      });
+    });
+  });
+});
+</script>
+{% endblock %}

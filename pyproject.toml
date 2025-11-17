@@ -3,4 +3,14 @@ name = "telegram-important-notifies"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "aiohttp",
+    "asyncio",
+    "jinja2",
+    "nltk",
+    "prettytable",
+    "pymorphy3",
+    "python-dotenv",
+    "rapidfuzz",
+    "Telethon",
+]

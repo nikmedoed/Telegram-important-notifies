@@ -3,5 +3,7 @@ prettytable
 pymorphy3
 python-dotenv
 rapidfuzz
-Telethon
+Telethon>=1.36.0
 asyncio
+aiohttp
+jinja2
