@@ -29,5 +29,7 @@
 - [x] Storing queries and target chats in database
 - [x] Web-GUI for chat selecting and queries settings
 - [x] Caching messages for duplicates detecting (from different chats etc.)
-- [ ] Resistance to the disappearance of the Internet
+- [x] Resistance to the disappearance of the Internet
 - [ ] Emprove search engine by Word2Vec
+- [ ] Improve RAM usage by cache engine without losing performance or forcing disk
+- [x] Manual excluding messages from processing by hash

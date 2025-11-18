@@ -47,6 +47,9 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         cache_key = f"{sender_id}_{messages_count}"
 
         message_hash = hashlib.sha256(text.encode()).hexdigest()
+        if db.is_message_blocked(message_hash):
+            logging.info(f"Blocked message skipped :: {skip_info}")
+            return
         previous_messages_count = duplicate_cache.get(message_hash)
         duplicate_cache.set(message_hash, messages_count)
 

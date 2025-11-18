@@ -4,6 +4,57 @@
 <article class="card">
   <h1>Кеш недавних сообщений</h1>
   <p>Всего записей: <strong>{{ total_entries }}</strong></p>
+  <p class="hint">Отсюда можно заблокировать повторяющиеся сообщения. Блокировка работает по хешу текста.</p>
+</article>
+
+<article class="card">
+  <header class="card-header">
+    <div>
+      <h2>Игнор-лист сообщений</h2>
+      <p class="hint">Всё что находится здесь, больше не будет пересылаться.</p>
+    </div>
+    <div>
+      <strong>Всего:</strong> {{ ignored_messages|length }}
+    </div>
+  </header>
+  {% if ignored_messages %}
+    <div class="table-wrapper">
+      <table class="simple-table">
+        <thead>
+          <tr>
+            <th>Хеш</th>
+            <th>Текст</th>
+            <th>Добавлено</th>
+            <th data-sortable="false" data-searchable="false">Действие</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for entry in ignored_messages %}
+          {% set text = entry.sample %}
+          {% set truncated = text[:240] %}
+          <tr>
+            <td><code>{{ entry.hash }}</code></td>
+            <td class="value-preview">
+              <pre>{{ truncated }}</pre>
+              {% if text|length > 240 %}
+                <div class="value-more">… ({{ text|length }} символов)</div>
+              {% endif %}
+            </td>
+            <td>{{ entry.created_at }}</td>
+            <td>
+              <form method="post" action="/cache/unignore">
+                <input type="hidden" name="hash" value="{{ entry.hash }}">
+                <button type="submit" class="button button-small">Удалить</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="hint">Список пуст.</p>
+  {% endif %}
 </article>
 
 {% for cache in caches %}
@@ -27,12 +78,20 @@
               <th>Фрагмент значения</th>
               <th>Истечёт через</th>
               <th>Истечёт в</th>
+              {% if cache.allow_block %}
+                <th data-sortable="false" data-searchable="false">Игнор</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
           {% for entry in cache.entries %}
             <tr>
-              <td><code>{{ entry.key }}</code></td>
+              <td>
+                <code>{{ entry.key }}</code>
+                {% if entry.hash is defined %}
+                  <div class="hint">hash: {{ entry.hash }}</div>
+                {% endif %}
+              </td>
               <td class="value-preview">
                 {% set value = entry.value %}
                 {% if value is string %}
@@ -47,6 +106,18 @@
               </td>
               <td>{{ entry.expires_in_human }}</td>
               <td>{{ entry.expires_at }}</td>
+              {% if cache.allow_block %}
+                <td>
+                  {% if entry.raw_value %}
+                    <form method="post" action="/cache/ignore">
+                      <textarea name="text" hidden>{{ entry.raw_value }}</textarea>
+                      <button type="submit" class="button button-small">Игнорировать</button>
+                    </form>
+                  {% else %}
+                    <span class="hint">Нет текста</span>
+                  {% endif %}
+                </td>
+              {% endif %}
             </tr>
           {% endfor %}
           </tbody>

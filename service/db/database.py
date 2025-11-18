@@ -30,6 +30,8 @@ class Database:
         self._apply_migrations()
         self._bootstrap_from_legacy_files()
         self._reload_assignment_cache()
+        self._blocked_hashes: Set[str] = set()
+        self._reload_blocked_messages_cache()
 
     # region helpers -----------------------------------------------------
     def _execute(self, sql: str, params: Sequence | Tuple = ()) -> sqlite3.Cursor:
@@ -93,6 +95,8 @@ class Database:
             self._remove_last_seen_column()
         if self._channel_relationships_reference_legacy_channels():
             self._refresh_channel_relationship_tables()
+        if not self._table_exists("blocked_messages"):
+            self._create_blocked_messages_table()
 
     def _column_exists(self, table: str, column: str) -> bool:
         rows = self._fetchall(f"PRAGMA table_info({table})")
@@ -136,7 +140,20 @@ class Database:
             finally:
                 if not foreign_keys_disabled:
                     self._conn.execute("PRAGMA foreign_keys=ON;")
-                    self._conn.commit()
+                self._conn.commit()
+
+    def _create_blocked_messages_table(self) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS blocked_messages (
+                    hash TEXT PRIMARY KEY,
+                    sample TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            self._conn.commit()
 
     def _remove_last_seen_column(self) -> None:
         with self._lock:
@@ -407,6 +424,54 @@ class Database:
     def get_metadata(self, key: str) -> str | None:
         row = self._fetchone("SELECT value FROM metadata WHERE key = ?", (key,))
         return row["value"] if row else None
+
+    # region blocked messages ------------------------------------------
+    def _reload_blocked_messages_cache(self) -> None:
+        rows = self._fetchall("SELECT hash FROM blocked_messages")
+        self._blocked_hashes = {row["hash"] for row in rows}
+
+    def is_message_blocked(self, message_hash: str) -> bool:
+        return message_hash in self._blocked_hashes
+
+    def add_blocked_message(self, message_hash: str, sample: str) -> bool:
+        cleaned = (sample or "").strip()
+        if not cleaned:
+            raise ValueError("Нельзя заблокировать пустой текст")
+        truncated = cleaned[:2048]
+        cur = self._execute(
+            """
+            INSERT INTO blocked_messages (hash, sample)
+            VALUES (?, ?)
+            ON CONFLICT(hash) DO NOTHING
+            """,
+            (message_hash, truncated),
+        )
+        created = cur.rowcount > 0
+        if created:
+            self._blocked_hashes.add(message_hash)
+        return created
+
+    def remove_blocked_message(self, message_hash: str) -> bool:
+        cur = self._execute("DELETE FROM blocked_messages WHERE hash = ?", (message_hash,))
+        removed = cur.rowcount > 0
+        if removed:
+            self._blocked_hashes.discard(message_hash)
+        return removed
+
+    def list_blocked_messages(self, limit: int = 100) -> List[Dict[str, str]]:
+        rows = self._fetchall(
+            """
+            SELECT hash, sample, created_at
+            FROM blocked_messages
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (max(1, limit),),
+        )
+        return [
+            {"hash": row["hash"], "sample": row["sample"], "created_at": row["created_at"]}
+            for row in rows
+        ]
 
     def _reload_assignment_cache(self) -> None:
         mapping: Dict[int, List[str]] = defaultdict(list)
