@@ -33,7 +33,7 @@ def _redirect(path: str, message: str | None = None) -> web.HTTPSeeOther:
     raise web.HTTPSeeOther(path)
 
 
-from . import channels, groups, queries  # noqa: E402  # isort:skip
+from . import cache, channels, groups, queries  # noqa: E402  # isort:skip
 
 
 def create_app(client) -> web.Application:
@@ -43,6 +43,7 @@ def create_app(client) -> web.Application:
     app.add_routes(queries.routes)
     app.add_routes(groups.routes)
     app.add_routes(channels.routes)
+    app.add_routes(cache.routes)
     return app
 
 

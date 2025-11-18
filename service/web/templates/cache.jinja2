@@ -1,0 +1,60 @@
+{% extends "base.jinja2" %}
+
+{% block content %}
+<article class="card">
+  <h1>Кеш недавних сообщений</h1>
+  <p>Всего записей: <strong>{{ total_entries }}</strong></p>
+</article>
+
+{% for cache in caches %}
+  <article class="card">
+    <header class="card-header">
+      <div>
+        <h2>{{ cache.title }}</h2>
+        <p class="hint">{{ cache.description }}</p>
+      </div>
+      <div>
+        <strong>TTL:</strong> {{ cache.ttl }} сек.<br>
+        <strong>Записей:</strong> {{ cache.entries|length }}
+      </div>
+    </header>
+    {% if cache.entries %}
+      <div class="table-wrapper">
+        <table class="simple-table">
+          <thead>
+            <tr>
+              <th>Ключ</th>
+              <th>Фрагмент значения</th>
+              <th>Истечёт через</th>
+              <th>Истечёт в</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for entry in cache.entries %}
+            <tr>
+              <td><code>{{ entry.key }}</code></td>
+              <td class="value-preview">
+                {% set value = entry.value %}
+                {% if value is string %}
+                  {% set truncated = value[:240] %}
+                  <pre>{{ truncated }}</pre>
+                  {% if value|length > 240 %}
+                    <div class="value-more">… ({{ value|length }} символов)</div>
+                  {% endif %}
+                {% else %}
+                  <pre>{{ value }}</pre>
+                {% endif %}
+              </td>
+              <td>{{ entry.expires_in_human }}</td>
+              <td>{{ entry.expires_at }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="hint">Кеш пуст.</p>
+    {% endif %}
+  </article>
+{% endfor %}
+{% endblock %}

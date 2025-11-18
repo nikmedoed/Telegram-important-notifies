@@ -57,6 +57,29 @@ class Cache:
                 return self.cache[key][0]
             return None
 
+    def dump(self):
+        """
+        Returns a snapshot of the cache entries without mutating them.
+
+        Returns:
+            list[dict]: A list of dictionaries with key, value, expires_at and expires_in fields.
+        """
+        snapshot = []
+        current_time = time.time()
+        with self.lock:
+            for key, (value, expiry) in self.cache.items():
+                if expiry < current_time:
+                    continue
+                snapshot.append(
+                    {
+                        "key": key,
+                        "value": value,
+                        "expires_at": expiry,
+                        "expires_in": max(0, int(expiry - current_time)),
+                    }
+                )
+        return snapshot
+
     def delete(self, key):
         """
         Removes the cache entry associated with the given key.
