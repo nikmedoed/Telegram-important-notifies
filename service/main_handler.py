@@ -94,4 +94,13 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         logging.error(f"Ошибка обработки сообщения: {e.__class__}: {e}\n"
                       f"{traceback.print_exc()}")
     finally:
-        await client.send_read_acknowledge(message.chat, messages)
+        entity = None
+        if 'message' in locals() and message:
+            entity = getattr(message, 'chat', None) or getattr(message, 'peer_id', None)
+        if not entity and hasattr(event, 'chat'):
+            entity = event.chat
+        if entity:
+            try:
+                await client.send_read_acknowledge(entity, messages)
+            except TypeError:
+                logging.warning("Skipped read acknowledge because entity is invalid.")
