@@ -5,15 +5,16 @@ from service.cache import Cache
 import string
 import pymorphy3
 from nltk.tokenize import sent_tokenize
+from nltk.stem import WordNetLemmatizer
 
-morph_en = pymorphy3.MorphAnalyzer()
+lemmatizer_en = WordNetLemmatizer()
 morph_ru = pymorphy3.MorphAnalyzer(lang='ru')
 cache = Cache(60*60*24)
 
 def normalize(word):
     if word.isalpha():
         if word.isascii():
-            normalized_word = morph_en.parse(word)[0].normal_form
+            normalized_word = lemmatizer_en.lemmatize(word.lower())
         else:
             normalized_word = morph_ru.parse(word)[0].normal_form
         return normalized_word

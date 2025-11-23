@@ -45,7 +45,10 @@ async def channel_detail(request: web.Request) -> web.Response:
 async def update_channel_queries(request: web.Request) -> web.Response:
     channel_id = int(request.match_info["channel_id"])
     data = await request.post()
-    query_ids = data.getall("query_ids")
+    try:
+        query_ids = data.getall("query_ids")
+    except KeyError:
+        query_ids = []
     db.set_channel_queries(channel_id, query_ids)
     _redirect(f"/channels/{channel_id}", "Связи обновлены")
 

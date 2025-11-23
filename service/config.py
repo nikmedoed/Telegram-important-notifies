@@ -1,10 +1,10 @@
+import logging
 import os
 import socket
 import time
 
 from dotenv import load_dotenv
 from telethon.sync import TelegramClient
-import logging
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,6 +21,8 @@ TELEGRAM_RETRY_DELAY_SECONDS = float(os.getenv("TELEGRAM_RETRY_DELAY_SECONDS", "
 TELEGRAM_NETWORK_CHECK_HOST = os.getenv("TELEGRAM_NETWORK_CHECK_HOST", "8.8.8.8")
 TELEGRAM_NETWORK_CHECK_PORT = int(os.getenv("TELEGRAM_NETWORK_CHECK_PORT", "53"))
 TELEGRAM_NETWORK_CHECK_TIMEOUT = float(os.getenv("TELEGRAM_NETWORK_CHECK_TIMEOUT", "3"))
+WEB_HOST = os.getenv("WEB_HOST", "0.0.0.0")
+WEB_PORT = int(os.getenv("WEB_PORT", "8080"))
 
 
 def _wait_for_internet_connection(delay: float, host: str, port: int, timeout: float) -> None:

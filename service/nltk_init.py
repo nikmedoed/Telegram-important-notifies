@@ -18,6 +18,8 @@ NLTK_LANGUAGE = os.getenv('NLTK_LANGUAGE', 'russian')
 
 _ensure_resource('tokenizers/punkt', 'punkt')
 _ensure_resource('tokenizers/punkt_tab', 'punkt_tab')
+_ensure_resource('corpora/wordnet', 'wordnet')
+_ensure_resource('corpora/omw-1.4', 'omw-1.4')
 
 # Trigger tokenizer init to make sure punkt downloads happened before runtime usage
 word_tokenize("warm up")

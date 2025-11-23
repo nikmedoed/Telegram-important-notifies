@@ -5,6 +5,7 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 from aiohttp import web
+from service.config import WEB_HOST, WEB_PORT
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -47,7 +48,9 @@ def create_app(client) -> web.Application:
     return app
 
 
-async def start_web_server(client, host: str = "127.0.0.1", port: int = 8080):
+async def start_web_server(client, host: str | None = None, port: int | None = None):
+    host = host if host is not None else WEB_HOST
+    port = port if port is not None else WEB_PORT
     app = create_app(client)
     runner = web.AppRunner(app)
     await runner.setup()
