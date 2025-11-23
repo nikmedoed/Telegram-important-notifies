@@ -4,7 +4,7 @@ import logging
 
 from aiohttp import web
 
-from service.channel_sync import fetch_dialog_channels
+from service.channel_sync import sync_channels_with_client
 from service.db import db
 from . import render_template, _redirect
 
@@ -56,15 +56,7 @@ async def update_channel_queries(request: web.Request) -> web.Response:
 async def refresh_channels(request: web.Request) -> web.Response:
     client = request.app["tg_client"]
     try:
-        existing_channels = db.list_channels()
-        existing_links = {channel.id: channel.invite_link for channel in existing_channels if channel.invite_link}
-        existing_ids = {channel.id for channel in existing_channels}
-        records = await fetch_dialog_channels(client, cached_links=existing_links)
-        fetched_ids = {record.id for record in records}
-        removed_ids = [channel_id for channel_id in existing_ids if channel_id not in fetched_ids]
-        removed = db.delete_channels(removed_ids)
-        db.delete_channels_by_kind("user")
-        updated = db.upsert_channels(records)
+        updated, removed = await sync_channels_with_client(client)
         msg = f"Обновлено {updated} записей"
         if removed:
             msg = f"{msg}, удалено {removed}"

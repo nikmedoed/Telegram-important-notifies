@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from telethon import functions
 from telethon.errors import ChannelInvalidError, ChatAdminRequiredError
 from telethon.tl import types as tl_types
 
-from service.db import ChannelRecord
+from service.db import ChannelRecord, db
 
 
 def _can_export_invite(entity) -> bool:
@@ -92,3 +92,17 @@ async def fetch_dialog_channels(client, cached_links: Optional[Dict[int, Optiona
             logging.warning("Skipping dialog due to error: %s", exc)
             continue
     return records
+
+
+async def sync_channels_with_client(client) -> Tuple[int, int]:
+    """Refresh stored channels using the provided Telegram client."""
+    existing_channels = db.list_channels()
+    existing_links = {channel.id: channel.invite_link for channel in existing_channels if channel.invite_link}
+    existing_ids = {channel.id for channel in existing_channels}
+    records = await fetch_dialog_channels(client, cached_links=existing_links)
+    fetched_ids = {record.id for record in records}
+    removed_ids = [channel_id for channel_id in existing_ids if channel_id not in fetched_ids]
+    removed = db.delete_channels(removed_ids) if removed_ids else 0
+    db.delete_channels_by_kind("user")
+    updated = db.upsert_channels(records)
+    return updated, removed

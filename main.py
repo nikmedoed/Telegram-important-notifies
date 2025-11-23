@@ -2,14 +2,17 @@ import logging
 
 from telethon.sync import events
 
+from service.channel_sync import sync_channels_with_client
 from service.config import client, TARGET_USER
 from service.main_handler import handle_new_message
 from service.process_history import process_unread_messages
+from service.channel_updates import setup_channel_update_handlers
 from service.web import start_web_server
 
 
 if __name__ == "__main__":
 
+    setup_channel_update_handlers(client)
     client.add_event_handler(handle_new_message, events.Album())
     client.add_event_handler(handle_new_message, events.NewMessage(incoming=True))
 
@@ -17,6 +20,11 @@ if __name__ == "__main__":
         runner = await start_web_server(client)
         await client.send_message(TARGET_USER, "Клиент успешно запущен!")
         logging.info("Client started")
+        try:
+            updated, removed = await sync_channels_with_client(client)
+            logging.info("Channels refreshed: updated=%s, removed=%s", updated, removed)
+        except Exception:
+            logging.exception("Failed to refresh channels on startup")
         await process_unread_messages()
         try:
             await client.run_until_disconnected()
