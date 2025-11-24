@@ -9,10 +9,11 @@ from hashlib import md5
 from pathlib import Path
 from typing import Dict, Iterable, Set
 
-from service.config import client, data_directory
+from service.config import data_directory
 from service.db import db
 from service.search_engine import tokenize
 from service.text_cleaner import clean_text
+from service.telegram_client import client
 
 
 def _collect_channel_tokens(queries: Iterable[str], tokens_map: Dict[str, list[str]] | None = None) -> Set[str]:

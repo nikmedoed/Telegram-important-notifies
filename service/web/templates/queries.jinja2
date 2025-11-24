@@ -10,6 +10,10 @@
         <form method="post" action="/queries">
             <label for="phrase">Текст запроса</label>
             <textarea id="phrase" name="phrase" rows="3" required></textarea>
+            <p class="hint">
+                Модификаторы: запятая — независимые части, все должны встретиться в тексте (можно далеко);
+                <code>+слово</code> — обязательный токен внутри части.
+            </p>
             <div class="form-actions">
                 <button type="submit">Сохранить</button>
             </div>

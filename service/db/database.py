@@ -7,7 +7,6 @@ from importlib import resources
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
-from service import search_engine as se
 from service.bootstrap import bootstrap_from_legacy_files
 from service.config import data_directory
 from .models import (
@@ -483,6 +482,8 @@ class Database:
         ]
 
     def _reload_assignment_cache(self) -> None:
+        from service import search_engine as se  # local import to avoid circular dependency during module load
+
         rows = self._fetchall(SQL_ASSIGNMENTS_FOR_CACHE)
         channel_queries: Dict[int, List[int]] = defaultdict(list)
         query_phrases: Dict[int, str] = {}
@@ -494,7 +495,8 @@ class Database:
         # Build unique query entries once (tokens are shared across channels).
         entries: Dict[int, QuerySearchEntry] = {}
         for qid, phrase in query_phrases.items():
-            entries[qid] = QuerySearchEntry(id=qid, phrase=phrase, tokens=se.tokenize(phrase))
+            tokens, clauses = se.parse_query_phrase(phrase)
+            entries[qid] = QuerySearchEntry(id=qid, phrase=phrase, tokens=tokens, clauses=clauses)
         self._query_entries = entries
 
         # Build per-channel search contexts with idf and tf-idf maps.
@@ -505,12 +507,13 @@ class Database:
             if not tokens_list:
                 continue
             idf_map = se._build_idf(tokens_list)
-            tfidf_map = {}
+            tfidf_map: Dict[int, tuple[tuple[dict[str, float], float], ...]] = {}
             for qid in unique_qids:
                 entry = entries.get(qid)
                 if not entry:
                     continue
-                tfidf_map[qid] = se._tfidf_vector(entry.tokens, idf_map)
+                clause_vectors = tuple(se._tfidf_vector(cl.tokens, idf_map) for cl in entry.clauses)
+                tfidf_map[qid] = clause_vectors
             self._channel_search_ctx[chat_id] = ChannelSearchContext(
                 query_ids=unique_qids,
                 idf_map=idf_map,

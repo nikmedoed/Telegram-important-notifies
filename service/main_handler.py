@@ -9,11 +9,11 @@ from telethon import events
 from telethon.tl import types
 
 from service.cache import Cache
-from service.config import client, TARGET_USER
 from service.db import db
 from service.search_engine import find_queries
 from service.text_cleaner import clean_text
 from service.utils import get_chat_name, get_message_source_link
+from service.telegram_client import client, TARGET_USER
 
 message_mutex = asyncio.Lock()
 duplicate_cache = Cache(60 * 60 * 12)

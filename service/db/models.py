@@ -28,10 +28,17 @@ class ChannelGroupRecord:
 
 
 @dataclass(frozen=True)
+class ClauseSpec:
+    tokens: tuple[str, ...]
+    required: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class QuerySearchEntry:
     id: int
     phrase: str
     tokens: list[str]
+    clauses: tuple[ClauseSpec, ...]
 
 
 @dataclass(frozen=True)
@@ -42,5 +49,5 @@ class ChannelSearchContext:
     """
     query_ids: tuple[int, ...]
     idf_map: dict[str, float]
-    tfidf_map: dict[int, tuple[dict[str, float], float]]
+    tfidf_map: dict[int, tuple[tuple[dict[str, float], float], ...]]
     entries_map: dict[int, QuerySearchEntry]

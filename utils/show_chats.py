@@ -1,5 +1,5 @@
 from prettytable import PrettyTable
-from service.config import client
+from service.telegram_client import client
 
 dialogs = client.get_dialogs()
 table = PrettyTable()

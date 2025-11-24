@@ -1,9 +1,9 @@
 import logging
 import traceback
-from service.db import db
 from telethon import functions
-from service.config import client, TARGET_USER
+from service.db import db
 from service.main_handler import handle_new_message
+from service.telegram_client import client, TARGET_USER
 
 
 # last_readed_id = result.messages[0].id

@@ -3,8 +3,8 @@ import traceback
 
 from telethon.tl import types
 
-from service.config import client
 from service.db import db
+from service.telegram_client import client
 
 
 async def get_message_source_link(message):

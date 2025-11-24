@@ -4,10 +4,11 @@ from service.nltk_init import stop_words
 from service.cache import Cache
 import string
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Iterable
 import pymorphy3
 from nltk.tokenize import sent_tokenize
 from nltk.stem import WordNetLemmatizer
+from service.db.models import ClauseSpec
 
 lemmatizer_en = WordNetLemmatizer()
 morph_ru = pymorphy3.MorphAnalyzer(lang='ru')
@@ -90,11 +91,11 @@ def _cosine_similarity(vec_a, norm_a, vec_b, norm_b):
     return dot / (norm_a * norm_b)
 
 
-def _match_tokens(query_tokens, sentence_tokens) -> List[Tuple[float, int]]:
+def _match_tokens(query_tokens: Iterable[str], sentence_tokens: list[str]) -> List[Tuple[str, float, int]]:
     if not query_tokens or not sentence_tokens:
         return []
     used = set()
-    matches: list[tuple[float, int]] = []
+    matches: list[tuple[str, float, int]] = []
     for qtok in query_tokens:
         best_score = 0.0
         best_pos = None
@@ -109,7 +110,7 @@ def _match_tokens(query_tokens, sentence_tokens) -> List[Tuple[float, int]]:
                     break
         if best_score >= TOKEN_THRESHOLD and best_pos is not None:
             used.add(best_pos)
-            matches.append((best_score, best_pos))
+            matches.append((qtok, best_score, best_pos))
     return matches
 
 
@@ -127,8 +128,8 @@ def _bag_token_score(query_tokens, sentence_tokens):
     if coverage < MIN_COVERAGE:
         return 0.0, matches
 
-    avg_sim = sum(s for s, _ in matches) / matched
-    positions = [pos for _, pos in matches]
+    avg_sim = sum(s for _, s, _ in matches) / matched
+    positions = [pos for _, _, pos in matches]
     span = max(positions) - min(positions) + 1 if matched > 1 else 1
     compactness = matched / span  # 1.0 if all matched tokens are contiguous
     # Keep compactness influence in [0.4, 1.0]
@@ -144,7 +145,7 @@ def _is_compact_match(query_tokens, matches, allowed_extra=COMPACT_EXTRA):
         return False
     if len(matches) != len(query_tokens):
         return False
-    positions = sorted(pos for _, pos in matches)
+    positions = sorted(pos for _, _, pos in matches)
     span = positions[-1] - positions[0] + 1 if len(positions) > 1 else 1
     extra = span - len(matches)
     return extra <= allowed_extra
@@ -173,11 +174,21 @@ def _has_contiguous_permutation(query_tokens, sentence_tokens):
     return False
 
 
-def find_phrase(query, text, *, query_tokens=None, idf_map=None, query_tfidf=None, query_norm=None):
+def find_phrase(
+    query,
+    text,
+    *,
+    query_tokens=None,
+    idf_map=None,
+    query_tfidf=None,
+    query_norm=None,
+    required_tokens: Iterable[str] | None = None,
+):
     query_tokens = query_tokens or tokenize(query)
     if not query_tokens:
         return 0.0
     joined_query = " ".join(query_tokens)
+    required_tokens = set(required_tokens or ())
 
     sentences = sent_tokenize(text)
     max_similarity = 0
@@ -202,6 +213,10 @@ def find_phrase(query, text, *, query_tokens=None, idf_map=None, query_tfidf=Non
             if not bag_score:
                 continue
 
+            matched_tokens = {qtok for qtok, _, _ in matches}
+            if required_tokens and not required_tokens.issubset(matched_tokens):
+                continue
+
             phrase_score = fuzz.partial_ratio(joined_query, " ".join(window_tokens))
             combined = 0.6 * bag_score + 0.4 * phrase_score
             if _is_compact_match(query_tokens, matches):
@@ -216,6 +231,37 @@ def find_phrase(query, text, *, query_tokens=None, idf_map=None, query_tfidf=Non
             max_similarity = max(max_similarity, combined)
 
     return max_similarity
+
+
+def _parse_clause(raw_clause: str) -> ClauseSpec:
+    tokens = tokenize(raw_clause)
+    required_tokens = set()
+    for raw in raw_clause.split():
+        if not raw.startswith("+") or len(raw) <= 1:
+            continue
+        normalized = normalize(raw.lstrip("+").strip().lower())
+        if not normalized or normalized in stop_words or normalized in string.punctuation:
+            continue
+        required_tokens.add(normalized)
+    required_tokens = tuple(sorted(tok for tok in required_tokens if tok in tokens))
+    return ClauseSpec(tokens=tuple(tokens), required=required_tokens)
+
+
+def parse_query_phrase(phrase: str) -> tuple[list[str], tuple[ClauseSpec, ...]]:
+    """
+    Split phrase into independent clauses (comma-separated) with required tokens (+word).
+    Returns flattened tokens (for idf/tfidf) and clause specs.
+    """
+    raw_clauses = [part.strip() for part in phrase.split(",") if part.strip()]
+    if not raw_clauses:
+        return [], tuple()
+    clauses = tuple(cl for part in raw_clauses if (cl := _parse_clause(part)).tokens)
+    if not clauses:
+        return [], tuple()
+    all_tokens: list[str] = []
+    for clause in clauses:
+        all_tokens.extend(clause.tokens)
+    return all_tokens, clauses
 
 
 def find_queries(queries, text):
@@ -238,39 +284,56 @@ def find_queries(queries, text):
             if not entry:
                 continue
             phrase = entry.phrase
-            qtokens = entry.tokens
-            vec, norm = tfidf_map.get(qid, ({}, 0.0))
-            results = find_phrase(
-                phrase,
-                text,
-                query_tokens=qtokens,
-                idf_map=idf_map,
-                query_tfidf=vec,
-                query_norm=norm,
-            )
-            if results >= 55:
-                res[phrase] = round(results, 2)
+            clauses = entry.clauses or (ClauseSpec(tokens=tuple(entry.tokens), required=tuple()),)
+            clause_vectors = tfidf_map.get(qid, ())
+            if not clause_vectors:
+                clause_vectors = tuple(_tfidf_vector(cl.tokens, idf_map) for cl in clauses)
+            clause_scores = []
+            for idx, clause in enumerate(clauses):
+                vec, norm = clause_vectors[idx] if idx < len(clause_vectors) else _tfidf_vector(clause.tokens, idf_map)
+                score = find_phrase(
+                    phrase,
+                    text,
+                    query_tokens=clause.tokens,
+                    idf_map=idf_map,
+                    query_tfidf=vec,
+                    query_norm=norm,
+                    required_tokens=clause.required,
+                )
+                clause_scores.append(score)
+            if clause_scores and min(clause_scores) >= 55:
+                res[phrase] = round(min(clause_scores), 2)
         return res
 
     # Otherwise assume an iterable of phrases (fallback path).
     phrases = list(queries)
     if not phrases:
         return res
-    tokens_map = {phrase: tokenize(phrase) for phrase in phrases}
-    idf_map = _build_idf(tokens_map.values())
-    tfidf_map = {phrase: _tfidf_vector(tokens_map[phrase], idf_map) for phrase in phrases}
-    for phrase, tokens in tokens_map.items():
-        vec, norm = tfidf_map.get(phrase, ({}, 0.0))
-        results = find_phrase(
-            phrase,
-            text,
-            query_tokens=tokens,
-            idf_map=idf_map,
-            query_tfidf=vec,
-            query_norm=norm,
-        )
-        if results >= 55:
-            res[phrase] = round(results, 2)
+    specs = []
+    for phrase in phrases:
+        tokens, clauses = parse_query_phrase(phrase)
+        if not clauses:
+            continue
+        specs.append((phrase, tokens, clauses))
+    if not specs:
+        return res
+    idf_map = _build_idf((tokens for _, tokens, _ in specs))
+    for phrase, tokens, clauses in specs:
+        clause_vectors = tuple(_tfidf_vector(cl.tokens, idf_map) for cl in clauses)
+        clause_scores = []
+        for clause, (vec, norm) in zip(clauses, clause_vectors):
+            score = find_phrase(
+                phrase,
+                text,
+                query_tokens=clause.tokens,
+                idf_map=idf_map,
+                query_tfidf=vec,
+                query_norm=norm,
+                required_tokens=clause.required,
+            )
+            clause_scores.append(score)
+        if clause_scores and min(clause_scores) >= 55:
+            res[phrase] = round(min(clause_scores), 2)
     return res
 
 

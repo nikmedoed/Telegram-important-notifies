@@ -65,10 +65,18 @@ def _get_query_meta(chat_id: int, queries: Tuple[str, ...]) -> Dict[str, object]
     cached = query_meta_cache.get(chat_id)
     if cached and cached.get("queries") == queries:
         return cached
-    tokens_map = {query: se.tokenize(query) for query in queries}
-    idf_map = se._build_idf(tokens_map.values())
-    tfidf_map = {query: se._tfidf_vector(tokens_map[query], idf_map) for query in queries}
-    data = {"queries": queries, "tokens": tokens_map, "idf": idf_map, "tfidf": tfidf_map}
+    specs = {}
+    for query in queries:
+        tokens, clauses = se.parse_query_phrase(query)
+        if not clauses:
+            continue
+        specs[query] = {"tokens": tokens, "clauses": clauses}
+    idf_map = se._build_idf((meta["tokens"] for meta in specs.values()))
+    tfidf_map = {
+        query: tuple(se._tfidf_vector(clause.tokens, idf_map) for clause in meta["clauses"])
+        for query, meta in specs.items()
+    }
+    data = {"queries": queries, "specs": specs, "idf": idf_map, "tfidf": tfidf_map}
     query_meta_cache[chat_id] = data
     return data
 
@@ -76,19 +84,26 @@ def _get_query_meta(chat_id: int, queries: Tuple[str, ...]) -> Dict[str, object]
 def _score_queries(meta: Dict[str, object], text: str) -> Dict[str, float]:
     scores: Dict[str, float] = {}
     idf_map = meta["idf"]
-    tokens_map = meta["tokens"]
+    specs = meta["specs"]
     tfidf_map = meta["tfidf"]
-    for query, tokens in tokens_map.items():
-        vec, norm = tfidf_map.get(query, ({}, 0.0))
-        score = se.find_phrase(
-            query,
-            text,
-            query_tokens=tokens,
-            idf_map=idf_map,
-            query_tfidf=vec,
-            query_norm=norm,
-        )
-        scores[query] = score
+    for query, meta_entry in specs.items():
+        clauses = meta_entry["clauses"]
+        clause_vectors = tfidf_map.get(query, ())
+        clause_scores = []
+        for idx, clause in enumerate(clauses):
+            vec, norm = clause_vectors[idx] if idx < len(clause_vectors) else se._tfidf_vector(clause.tokens, idf_map)
+            score = se.find_phrase(
+                query,
+                text,
+                query_tokens=clause.tokens,
+                idf_map=idf_map,
+                query_tfidf=vec,
+                query_norm=norm,
+                required_tokens=clause.required,
+            )
+            clause_scores.append(score)
+        if clause_scores:
+            scores[query] = min(clause_scores)
     return scores
 
 

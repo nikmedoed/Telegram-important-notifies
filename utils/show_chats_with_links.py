@@ -3,7 +3,7 @@ from telethon import functions
 from telethon.errors.rpcerrorlist import ChannelInvalidError, ChatAdminRequiredError
 from telethon.tl.types import User, Chat, Channel
 
-from service.config import client
+from service.telegram_client import client
 
 dialogs = client.get_dialogs()
 table = PrettyTable()

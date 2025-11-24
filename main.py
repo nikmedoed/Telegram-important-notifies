@@ -3,11 +3,11 @@ import logging
 from telethon.sync import events
 
 from service.channel_sync import sync_channels_with_client
-from service.config import client, TARGET_USER
 from service.main_handler import handle_new_message
 from service.process_history import process_unread_messages
 from service.channel_updates import setup_channel_update_handlers
 from service.web import start_web_server
+from service.telegram_client import client, TARGET_USER
 
 
 if __name__ == "__main__":
