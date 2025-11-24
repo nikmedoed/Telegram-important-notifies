@@ -12,6 +12,7 @@ from service.cache import Cache
 from service.config import client, TARGET_USER
 from service.db import db
 from service.search_engine import find_queries
+from service.text_cleaner import clean_text
 from service.utils import get_chat_name, get_message_source_link
 
 message_mutex = asyncio.Lock()
@@ -55,7 +56,10 @@ async def process_message(event, forward_func, message, queries, messages_count)
         logging.info(f"No text :: {mess_info}")
         return None
 
-    text = message.text.lower()
+    text = clean_text(message.text).lower()
+    if not text:
+        logging.info(f"No usable text after cleaning :: {mess_info}")
+        return None
     trep = text.replace('\n', '|')
     skip_info = f"{mess_info} :: {trep}"
 
