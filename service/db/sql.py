@@ -137,7 +137,7 @@ SQL_COPY_CHANNELS_FROM_LEGACY = """
     SELECT id, title, invite_link, username, kind FROM legacy_channels
 """
 SQL_ASSIGNMENTS_FOR_CACHE = """
-    SELECT cq.channel_id, q.phrase
+    SELECT cq.channel_id, cq.query_id, q.phrase
     FROM channel_queries cq
     JOIN queries q ON q.id = cq.query_id
     ORDER BY cq.channel_id

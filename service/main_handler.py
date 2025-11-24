@@ -32,22 +32,22 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         messages_count = len(messages) if isinstance(messages, list) else 1
         message = messages[0] if isinstance(messages, list) else messages
         chat_id = message.chat_id
-        queries = db.get_queries_for_chat(chat_id)
-        if not queries:
+        ctx = db.get_channel_search_context(chat_id)
+        if not ctx or not ctx.query_ids:
             return
 
         entity = getattr(message, 'chat', None) or getattr(message, 'peer_id', None)
         if not entity and hasattr(event, 'chat'):
             entity = event.chat
 
-        await process_message(event, forward_func, message, queries, messages_count)
+        await process_message(event, forward_func, message, ctx, messages_count)
         await client.send_read_acknowledge(entity, messages)
     except Exception as e:
         logging.error(f"Ошибка обработки сообщения: {e.__class__}: {e}\n"
                       f"{traceback.print_exc()}")
 
 
-async def process_message(event, forward_func, message, queries, messages_count):
+async def process_message(event, forward_func, message, ctx, messages_count):
     chat_id  = message.chat_id
     chat = await get_chat_name(message)
     mess_info = f"{chat_id} :: {chat} :: mid:{message.id}"
@@ -91,7 +91,7 @@ async def process_message(event, forward_func, message, queries, messages_count)
                 logging.info(f"Duplicate by similarity ({similarity:.1f}) :: {skip_info}")
                 return None
 
-    res = find_queries(queries, text)
+    res = find_queries(ctx, text)
     if not res:
         logging.info(f"Skipped :: {skip_info}")
         return None

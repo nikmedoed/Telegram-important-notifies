@@ -7,9 +7,16 @@ from importlib import resources
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
+from service import search_engine as se
 from service.bootstrap import bootstrap_from_legacy_files
 from service.config import data_directory
-from .models import ChannelGroupRecord, ChannelRecord, QueryRecord
+from .models import (
+    ChannelGroupRecord,
+    ChannelRecord,
+    QueryRecord,
+    QuerySearchEntry,
+    ChannelSearchContext,
+)
 from .sql import *
 
 
@@ -29,6 +36,8 @@ class Database:
         self._ensure_schema()
         self._apply_migrations()
         self._bootstrap_from_legacy_files()
+        self._query_entries: Dict[int, QuerySearchEntry] = {}
+        self._channel_search_ctx: Dict[int, ChannelSearchContext] = {}
         self._reload_assignment_cache()
         self._blocked_hashes: Set[str] = set()
         self._reload_blocked_messages_cache()
@@ -474,12 +483,45 @@ class Database:
         ]
 
     def _reload_assignment_cache(self) -> None:
-        mapping: Dict[int, List[str]] = defaultdict(list)
         rows = self._fetchall(SQL_ASSIGNMENTS_FOR_CACHE)
+        channel_queries: Dict[int, List[int]] = defaultdict(list)
+        query_phrases: Dict[int, str] = {}
         for row in rows:
-            mapping[row["channel_id"]].append(row["phrase"])
+            qid = int(row["query_id"])
+            channel_queries[int(row["channel_id"])].append(qid)
+            query_phrases[qid] = row["phrase"]
+
+        # Build unique query entries once (tokens are shared across channels).
+        entries: Dict[int, QuerySearchEntry] = {}
+        for qid, phrase in query_phrases.items():
+            entries[qid] = QuerySearchEntry(id=qid, phrase=phrase, tokens=se.tokenize(phrase))
+        self._query_entries = entries
+
+        # Build per-channel search contexts with idf and tf-idf maps.
+        self._channel_search_ctx = {}
+        for chat_id, qids in channel_queries.items():
+            unique_qids = tuple(sorted(set(qids)))
+            tokens_list = [entries[qid].tokens for qid in unique_qids if qid in entries]
+            if not tokens_list:
+                continue
+            idf_map = se._build_idf(tokens_list)
+            tfidf_map = {}
+            for qid in unique_qids:
+                entry = entries.get(qid)
+                if not entry:
+                    continue
+                tfidf_map[qid] = se._tfidf_vector(entry.tokens, idf_map)
+            self._channel_search_ctx[chat_id] = ChannelSearchContext(
+                query_ids=unique_qids,
+                idf_map=idf_map,
+                tfidf_map=tfidf_map,
+                entries_map=entries,
+            )
+
+        # Backwards-compatible phrases per chat for external callers.
         self._queries_by_chat: Dict[int, Tuple[str, ...]] = {
-            chat_id: tuple(phrases) for chat_id, phrases in mapping.items()
+            chat_id: tuple(entries[qid].phrase for qid in ctx.query_ids if qid in entries)
+            for chat_id, ctx in self._channel_search_ctx.items()
         }
         self._tracked_chats = set(self._queries_by_chat.keys())
 
@@ -488,3 +530,9 @@ class Database:
 
     def get_tracked_chat_ids(self) -> Tuple[int, ...]:
         return tuple(self._tracked_chats)
+
+    def get_query_entries(self) -> Dict[int, QuerySearchEntry]:
+        return self._query_entries
+
+    def get_channel_search_context(self, chat_id: int) -> ChannelSearchContext | None:
+        return self._channel_search_ctx.get(chat_id)

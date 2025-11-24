@@ -25,3 +25,22 @@ class ChannelGroupRecord:
     title: str
     description: str | None = None
     channel_count: int = 0
+
+
+@dataclass(frozen=True)
+class QuerySearchEntry:
+    id: int
+    phrase: str
+    tokens: list[str]
+
+
+@dataclass(frozen=True)
+class ChannelSearchContext:
+    """
+    Per-channel search metadata built from assigned queries.
+    Holds idf map and per-query tf-idf vectors (normalized) using shared tokens from QuerySearchEntry.
+    """
+    query_ids: tuple[int, ...]
+    idf_map: dict[str, float]
+    tfidf_map: dict[int, tuple[dict[str, float], float]]
+    entries_map: dict[int, QuerySearchEntry]

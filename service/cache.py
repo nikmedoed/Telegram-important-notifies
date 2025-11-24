@@ -1,5 +1,7 @@
 import threading
 import time
+from collections import OrderedDict
+from typing import Any
 
 DEFAULLT_TTL = 60 * 60 * 24
 
@@ -14,19 +16,27 @@ class Cache:
 
     ttl = DEFAULLT_TTL
 
-    def __init__(self, ttl: int = None):
+    def __init__(self, ttl: int = None, max_items: int | None = None):
         """
         Initializes the Cache object.
 
         Args:
             ttl (int, optional): The default TTL for cache entries. If not provided, uses the class-level ttl.
+            max_items (int, optional): Hard cap on stored items; oldest entries are evicted when exceeded.
         """
         if ttl:
             self.ttl = ttl
-        self.cache = {}
+        self.max_items = max_items
+        self.cache: OrderedDict[Any, tuple[Any, float]] = OrderedDict()
         self.lock = threading.Lock()
         cleanup_thread = threading.Thread(target=self.cleanup, daemon=True)
         cleanup_thread.start()
+
+    def _evict_if_needed(self) -> None:
+        if self.max_items is None:
+            return
+        while len(self.cache) > self.max_items:
+            self.cache.popitem(last=False)
 
     def set(self, key, value, ttl=None):
         """
@@ -41,6 +51,8 @@ class Cache:
             ttl = self.ttl
         with self.lock:
             self.cache[key] = (value, time.time() + ttl)
+            self.cache.move_to_end(key)
+            self._evict_if_needed()
 
     def get(self, key):
         """
@@ -53,8 +65,12 @@ class Cache:
             The value associated with the key if it exists and hasn't expired, otherwise None.
         """
         with self.lock:
-            if key in self.cache and self.cache[key][1] >= time.time():
-                return self.cache[key][0]
+            if key in self.cache:
+                value, expiry = self.cache[key]
+                if expiry >= time.time():
+                    self.cache.move_to_end(key)
+                    return value
+                del self.cache[key]
             return None
 
     def dump(self):
@@ -67,7 +83,7 @@ class Cache:
         snapshot = []
         current_time = time.time()
         with self.lock:
-            for key, (value, expiry) in self.cache.items():
+            for key, (value, expiry) in list(self.cache.items()):
                 if expiry < current_time:
                     continue
                 snapshot.append(
@@ -101,6 +117,7 @@ class Cache:
                 expired_keys = [key for key, (_, expiry) in self.cache.items() if expiry < current_time]
                 for key in expired_keys:
                     del self.cache[key]
+                self._evict_if_needed()
             time.sleep(max(0.5, self.ttl / 30))
 
     def __str__(self):
@@ -115,15 +132,18 @@ class Cache:
 
 if __name__ == "__main__":
     TIME = 10
-    cache = Cache(TIME)
+    cache = Cache(TIME, max_items=2)
     cache.set('key1', 'value1')
     print(cache)
     cache.set('key2', 'value2', ttl=TIME * 2)
+    print(cache)
+    cache.set('key3', 'value3')
     print(cache)
 
     for i in range(5):
         print(cache.get('key1'))
         print(cache.get('key2'))
+        print(cache.get('key3'))
         print(cache)
         time.sleep(TIME + 1)
         print(f"\t>> +{TIME + 1} sec")

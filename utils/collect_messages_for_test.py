@@ -15,10 +15,13 @@ from service.search_engine import tokenize
 from service.text_cleaner import clean_text
 
 
-def _collect_channel_tokens(queries: Iterable[str]) -> Set[str]:
+def _collect_channel_tokens(queries: Iterable[str], tokens_map: Dict[str, list[str]] | None = None) -> Set[str]:
     tokens: Set[str] = set()
     for phrase in queries:
-        tokens.update(tokenize(phrase))
+        if tokens_map and phrase in tokens_map:
+            tokens.update(tokens_map[phrase])
+        else:
+            tokens.update(tokenize(phrase))
     return tokens
 
 
@@ -69,7 +72,10 @@ def main(limit_per_chat: int = 1000) -> None:
         if not queries:
             continue
 
-        channel_tokens = _collect_channel_tokens(queries)
+        channel_tokens = _collect_channel_tokens(
+            queries,
+            tokens_map=None,
+        )
         if not channel_tokens:
             continue
 
