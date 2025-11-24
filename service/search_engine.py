@@ -234,15 +234,18 @@ def find_phrase(
 
 
 def _parse_clause(raw_clause: str) -> ClauseSpec:
-    tokens = tokenize(raw_clause)
+    # Strip "+" from tokens before tokenization to keep required tokens comparable.
+    parts = []
     required_tokens = set()
     for raw in raw_clause.split():
-        if not raw.startswith("+") or len(raw) <= 1:
-            continue
-        normalized = normalize(raw.lstrip("+").strip().lower())
-        if not normalized or normalized in stop_words or normalized in string.punctuation:
-            continue
-        required_tokens.add(normalized)
+        cleaned = raw.lstrip("+")
+        parts.append(cleaned)
+        if raw.startswith("+") and len(cleaned) > 0:
+            normalized = normalize(cleaned.strip().lower())
+            if normalized and normalized not in stop_words and normalized not in string.punctuation:
+                required_tokens.add(normalized)
+
+    tokens = tokenize(" ".join(parts))
     required_tokens = tuple(sorted(tok for tok in required_tokens if tok in tokens))
     return ClauseSpec(tokens=tuple(tokens), required=required_tokens)
 
