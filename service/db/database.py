@@ -496,7 +496,7 @@ class Database:
         entries: Dict[int, QuerySearchEntry] = {}
         for qid, phrase in query_phrases.items():
             tokens, clauses = se.parse_query_phrase(phrase)
-            entries[qid] = QuerySearchEntry(id=qid, phrase=phrase, tokens=tokens, clauses=clauses)
+            entries[qid] = QuerySearchEntry(id=qid, phrase=phrase, tokens=tuple(tokens), clauses=clauses)
         self._query_entries = entries
 
         # Build per-channel search contexts with idf and tf-idf maps.

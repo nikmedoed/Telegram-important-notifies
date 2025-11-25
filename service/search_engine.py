@@ -11,6 +11,7 @@ from nltk.stem import WordNetLemmatizer
 from service.db.models import ClauseSpec
 
 lemmatizer_en = WordNetLemmatizer()
+# Limit pymorphy cache to keep memory usage low on long-running processes.
 morph_ru = pymorphy3.MorphAnalyzer(lang='ru')
 # Limit tokenization cache to avoid unbounded growth on long-running processes.
 cache = Cache(60 * 60 * 24, max_items=5000)
@@ -209,6 +210,9 @@ def find_phrase(
             if not window_tokens:
                 break
 
+            if required_tokens and not required_tokens.issubset(window_tokens):
+                continue
+
             bag_score, matches = _bag_token_score(query_tokens, window_tokens)
             if not bag_score:
                 continue
@@ -238,7 +242,7 @@ def _parse_clause(raw_clause: str) -> ClauseSpec:
     parts = []
     required_tokens = set()
     for raw in raw_clause.split():
-        cleaned = raw.lstrip("+")
+        cleaned = raw.lstrip("+").strip(string.punctuation)
         parts.append(cleaned)
         if raw.startswith("+") and len(cleaned) > 0:
             normalized = normalize(cleaned.strip().lower())

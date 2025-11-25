@@ -16,8 +16,8 @@ from service.utils import get_chat_name, get_message_source_link
 from service.telegram_client import client, TARGET_USER
 
 message_mutex = asyncio.Lock()
-duplicate_cache = Cache(60 * 60 * 12)
 advanced_duplicate_cache = Cache(60 * 15)
+duplicate_cache = Cache(60 * 60 * 12, max_items=5000)
 
 
 async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_func=None):

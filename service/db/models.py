@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class QueryRecord:
     id: int
     phrase: str
     channel_count: int = 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChannelRecord:
     id: int
     title: str
@@ -19,7 +19,7 @@ class ChannelRecord:
     kind: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChannelGroupRecord:
     id: int
     title: str
@@ -27,21 +27,21 @@ class ChannelGroupRecord:
     channel_count: int = 0
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClauseSpec:
     tokens: tuple[str, ...]
     required: tuple[str, ...] = ()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class QuerySearchEntry:
     id: int
     phrase: str
-    tokens: list[str]
+    tokens: tuple[str, ...]
     clauses: tuple[ClauseSpec, ...]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ChannelSearchContext:
     """
     Per-channel search metadata built from assigned queries.
