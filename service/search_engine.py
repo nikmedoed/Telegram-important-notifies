@@ -92,6 +92,19 @@ def _cosine_similarity(vec_a, norm_a, vec_b, norm_b):
     return dot / (norm_a * norm_b)
 
 
+def _token_match_threshold(qtok: str, stok: str) -> float:
+    """
+    Use stricter similarity for very short tokens to avoid accidental matches
+    like 'час' vs 'часы' while keeping the default threshold for normal words.
+    """
+    shortest = min(len(qtok), len(stok))
+    if shortest <= 3:
+        return 90.0
+    if shortest == 4:
+        return 85.0
+    return TOKEN_THRESHOLD
+
+
 def _match_tokens(query_tokens: Iterable[str], sentence_tokens: list[str]) -> List[Tuple[str, float, int]]:
     if not query_tokens or not sentence_tokens:
         return []
@@ -100,6 +113,7 @@ def _match_tokens(query_tokens: Iterable[str], sentence_tokens: list[str]) -> Li
     for qtok in query_tokens:
         best_score = 0.0
         best_pos = None
+        best_threshold = TOKEN_THRESHOLD
         for idx, stok in enumerate(sentence_tokens):
             if idx in used:
                 continue
@@ -107,9 +121,10 @@ def _match_tokens(query_tokens: Iterable[str], sentence_tokens: list[str]) -> Li
             if sim > best_score:
                 best_score = sim
                 best_pos = idx
+                best_threshold = _token_match_threshold(qtok, stok)
                 if sim == 100:
                     break
-        if best_score >= TOKEN_THRESHOLD and best_pos is not None:
+        if best_pos is not None and best_score >= best_threshold:
             used.add(best_pos)
             matches.append((qtok, best_score, best_pos))
     return matches

@@ -93,6 +93,16 @@ English sales, CRM, remote, commission, no cold calls.""",
         res = find_queries(["devops kubernetes terraform ansible"], self.text("destination_specialist"))
         self.assertFalse(res)
 
+    def test_smart_watch_not_confused_with_smart_home_hour(self):
+        text = """Xiaomi Smart Humidifier 2
+Емкость резервуара — 4,5 л | Производительность до 350 мл пара в час
+Подключается к умному дому
+В использовании был пару месяцев
+15 000 драм"""
+        res = find_queries(["умные часы"], text)
+        self.assertNotIn("умные часы", res)
+        self.assertLess(find_phrase("умные часы", text), 10.0)
+
     # --- Required token handling --------------------------------------
     def test_required_token_present(self):
         phrase = "+fastapi python backend"
