@@ -2,9 +2,16 @@
 
 {% block content %}
 <article class="card">
-  <h1>Кеш недавних сообщений</h1>
-  <p>Всего записей: <strong>{{ total_entries }}</strong></p>
-  <p class="hint">Отсюда можно заблокировать повторяющиеся сообщения. Блокировка работает по хешу текста.</p>
+  <header class="card-header">
+    <div>
+      <h2>{{ hash_cache.title }}</h2>
+      <p class="hint">{{ hash_cache.description }}</p>
+    </div>
+    <div>
+      <strong>TTL:</strong> {{ hash_cache.ttl }} сек.<br>
+      <strong>Записей:</strong> {{ hash_cache.entries_count }}
+    </div>
+  </header>
 </article>
 
 <article class="card">

@@ -58,12 +58,13 @@ async def cache_overview(request: web.Request) -> web.Response:
             return {"hash": hashlib.sha256(value.encode()).hexdigest()}
         return {}
 
+    hash_cache_stats = {
+        "title": "Кеш хешей сообщений (статистика)",
+        "description": "Позволяет быстро отбрасывать точные дубликаты сообщений.",
+        "ttl": duplicate_cache.ttl,
+        "entries_count": len(duplicate_cache.dump()),
+    }
     caches = [
-        _serialize_cache(
-            duplicate_cache,
-            "Кеш хешей сообщений",
-            "Позволяет быстро отбрасывать точные дубликаты сообщений.",
-        ),
         _serialize_cache(
             advanced_duplicate_cache,
             "Кеш последних сообщений отправителей",
@@ -77,13 +78,12 @@ async def cache_overview(request: web.Request) -> web.Response:
             "Сохраняет результаты нормализации текста для поиска совпадений.",
         ),
     ]
-    total_entries = sum(len(cache["entries"]) for cache in caches)
     ignored = db.list_blocked_messages(limit=200)
     return render_template(
         "cache.jinja2",
         title="Кеш сообщений",
         caches=caches,
-        total_entries=total_entries,
+        hash_cache=hash_cache_stats,
         ignored_messages=ignored,
         message=request.rel_url.query.get("msg"),
     )
