@@ -31,9 +31,15 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
 
         messages_count = len(messages) if isinstance(messages, list) else 1
         message = messages[0] if isinstance(messages, list) else messages
+        is_album_event = isinstance(messages, list) and messages_count > 1
         chat_id = message.chat_id
         ctx = db.get_channel_search_context(chat_id)
         if not ctx or not ctx.query_ids:
+            return
+
+        # For grouped media (albums) rely on the Album event to avoid
+        # splitting and forwarding only the first media item.
+        if not is_album_event and getattr(message, "grouped_id", None):
             return
 
         entity = getattr(message, 'chat', None) or getattr(message, 'peer_id', None)
