@@ -46,7 +46,16 @@ async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_
         if not entity and hasattr(event, 'chat'):
             entity = event.chat
 
-        await process_message(event, forward_func, message, ctx, messages_count)
+        album_messages = messages if isinstance(messages, list) else None
+
+        async def album_forward():
+            # Explicitly forward all grouped messages to avoid Telethon
+            # auto-forward losing part of the media group.
+            return await client.forward_messages(TARGET_USER, album_messages)
+
+        forward = album_forward if album_messages else forward_func
+
+        await process_message(event, forward, message, ctx, messages_count)
         await client.send_read_acknowledge(entity, messages)
     except Exception as e:
         logging.error(f"Ошибка обработки сообщения: {e.__class__}: {e}\n"
