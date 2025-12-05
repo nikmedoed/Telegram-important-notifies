@@ -7,6 +7,7 @@ import traceback
 from rapidfuzz import fuzz
 from telethon import events
 from telethon.tl import types
+from telethon.utils import get_peer_id
 
 from service.cache import Cache
 from service.db import db
@@ -22,6 +23,58 @@ duplicate_cache = Cache(60 * 15, max_items=5000)
 # Similarity cache: compares sorted tokens for near-duplicates.
 advanced_duplicate_cache = Cache(60 * 15)
 ignore_matcher = IgnoreMatcher(db)
+
+
+def _get_original_author_id(message) -> int | None:
+    """Prefer original sender/channel from forwarded metadata."""
+    fwd = getattr(message, "fwd_from", None)
+    if fwd:
+        if getattr(fwd, "from_id", None):
+            try:
+                return get_peer_id(fwd.from_id)
+            except Exception:
+                pass
+        if getattr(fwd, "saved_from_peer", None):
+            try:
+                return get_peer_id(fwd.saved_from_peer)
+            except Exception:
+                pass
+    # Fallbacks: sender_id for chats, or chat_id as last resort.
+    if getattr(message, "sender_id", None):
+        return message.sender_id
+    return getattr(message, "chat_id", None)
+
+
+async def handle_control_message(event: events.newmessage.NewMessage.Event) -> None:
+    """Process commands in the private chat with TARGET_USER."""
+    message = getattr(event, "message", event)
+    command = (message.text or "").strip().lower()
+    if command != "нет":
+        return
+    reply = await message.get_reply_message()
+    if not reply:
+        await message.reply("Ответьте 'нет' на пересланное сообщение, чтобы добавить его в игнор.")
+        return
+    if not reply.text:
+        await message.reply("В исходном сообщении нет текста — игнор не сохранен.")
+        return
+    normalized = clean_text(reply.text).lower()
+    if not normalized:
+        await message.reply("После очистки текста ничего не осталось, игнор не сохранен.")
+        return
+    author_id = _get_original_author_id(reply)
+    if author_id is None:
+        await message.reply("Не удалось определить автора, игнор не сохранен.")
+        return
+    try:
+        created, entry = db.add_blocked_message(normalized, author_id=author_id)
+        ignore_matcher.add_entry(entry)
+    except ValueError as exc:
+        await message.reply(str(exc))
+        return
+    feedback = "Добавлено в игнор" if created else "Правило обновлено"
+    await message.reply(f"{feedback} для автора {author_id}")
+    logging.info("Ignore via reply :: author %s :: %s", author_id, normalized[:64])
 
 
 async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_func=None):
