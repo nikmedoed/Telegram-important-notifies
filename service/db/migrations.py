@@ -95,6 +95,8 @@ def _migrate_blocked_messages_table(conn, lock: threading.RLock) -> None:
     has_hash = _column_exists(conn, lock, "blocked_messages", "hash")
     has_sample_hash = _column_exists(conn, lock, "blocked_messages", "sample_hash")
     has_author = _column_exists(conn, lock, "blocked_messages", "author_id")
+    has_id = _column_exists(conn, lock, "blocked_messages", "id")
+    has_created_at = _column_exists(conn, lock, "blocked_messages", "created_at")
 
     # If hash/sample_hash columns exist, rebuild table without them.
     if has_hash or has_sample_hash:
@@ -108,19 +110,40 @@ def _migrate_blocked_messages_table(conn, lock: threading.RLock) -> None:
                           )
                           """)
         try:
+            select_columns = [
+                col
+                for col, present in (
+                    ("id", has_id),
+                    ("sample", True),
+                    ("author_id", has_author),
+                    ("created_at", has_created_at),
+                )
+                if present
+            ]
             rows = _exec(
                 conn,
                 lock,
-                "SELECT id, sample, author_id, created_at FROM blocked_messages",
+                f"SELECT {', '.join(select_columns)} FROM blocked_messages",
                 commit=False,
             ).fetchall()
             for row in rows:
                 author_val = row["author_id"] if has_author else None
+                insert_columns = ["sample", "author_id"]
+                insert_values = [row["sample"], author_val]
+                if has_created_at:
+                    insert_columns.append("created_at")
+                    insert_values.append(row["created_at"])
+                placeholders = ", ".join(["?"] * len(insert_columns))
+                column_list = ", ".join(insert_columns)
+                if has_id:
+                    column_list = "id, " + column_list
+                    placeholders = "?, " + placeholders
+                    insert_values = [row["id"]] + insert_values
                 _exec(
                     conn,
                     lock,
-                    "INSERT INTO blocked_messages_new (id, sample, author_id, created_at) VALUES (?, ?, ?, ?)",
-                    (row["id"], row["sample"], author_val, row["created_at"]),
+                    f"INSERT INTO blocked_messages_new ({column_list}) VALUES ({placeholders})",
+                    tuple(insert_values),
                 )
             _exec(conn, lock, "DROP TABLE blocked_messages")
             _exec(conn, lock, "ALTER TABLE blocked_messages_new RENAME TO blocked_messages")
