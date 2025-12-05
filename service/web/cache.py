@@ -93,11 +93,11 @@ async def cache_overview(request: web.Request) -> web.Response:
     ignored = db.list_blocked_messages(limit=200)
     return render_template(
         "cache.jinja2",
+        request=request,
         title="Кеш сообщений",
         caches=caches,
         hash_cache=hash_cache_stats,
         ignored_messages=ignored,
-        message=request.rel_url.query.get("msg"),
     )
 
 

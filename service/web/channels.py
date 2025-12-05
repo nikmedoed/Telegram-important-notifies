@@ -13,7 +13,7 @@ async def channels_page(request: web.Request) -> web.Response:
     return render_template(
         "channels.jinja2",
         title="Каналы",
-        message=request.rel_url.query.get("msg"),
+        request=request,
         channels=db.list_channels(),
         channel_groups_map=db.get_channel_groups_map(),
     )
@@ -34,7 +34,7 @@ async def channel_detail(request: web.Request) -> web.Response:
     return render_template(
         "channel_detail.jinja2",
         title=f"Канал {record.title}",
-        message=request.rel_url.query.get("msg"),
+        request=request,
         channel=record,
         queries=ordered_queries,
         assigned_queries=assigned,

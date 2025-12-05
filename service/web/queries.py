@@ -7,9 +7,8 @@ from . import render_template, _redirect
 
 
 async def index(request: web.Request) -> web.Response:
-    message = request.rel_url.query.get("msg")
     queries = db.list_queries()
-    return render_template("queries.jinja2", title="Запросы", message=message, queries=queries)
+    return render_template("queries.jinja2", request=request, title="Запросы", queries=queries)
 
 
 async def add_query(request: web.Request) -> web.Response:
@@ -38,7 +37,7 @@ async def query_detail(request: web.Request) -> web.Response:
     return render_template(
         "query_detail.jinja2",
         title=f"Запрос {record.id}",
-        message=request.rel_url.query.get("msg"),
+        request=request,
         query=record,
         selected_channels=[channel for channel in channels if channel.id in assigned],
         available_channels=[channel for channel in channels if channel.id not in assigned],

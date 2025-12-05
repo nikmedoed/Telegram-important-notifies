@@ -7,9 +7,8 @@ from . import render_template, _redirect
 
 
 async def groups_page(request: web.Request) -> web.Response:
-    message = request.rel_url.query.get("msg")
     groups = db.list_channel_groups()
-    return render_template("groups.jinja2", title="Группы каналов", message=message, groups=groups)
+    return render_template("groups.jinja2", request=request, title="Группы каналов", groups=groups)
 
 
 async def add_group(request: web.Request) -> web.Response:
@@ -55,7 +54,7 @@ async def group_detail(request: web.Request) -> web.Response:
     return render_template(
         "group_detail.jinja2",
         title=f"Группа {record.title}",
-        message=request.rel_url.query.get("msg"),
+        request=request,
         group=record,
         selected_channels=[channel for channel in channels if channel.id in assigned],
         available_channels=[channel for channel in channels if channel.id not in assigned],
