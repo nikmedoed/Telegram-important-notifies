@@ -27,9 +27,17 @@
   {% if ignored_messages %}
     <div class="table-wrapper">
       <table class="simple-table">
+        <colgroup>
+          <col style="width: 3ch;">
+          <col style="width: 5ch;">
+          <col style="width: auto;">
+          <col style="width: 9ch;">
+          <col style="width: 6ch;">
+        </colgroup>
         <thead>
           <tr>
-            <th>Хеш</th>
+            <th>ID</th>
+            <th>Автор</th>
             <th>Текст</th>
             <th>Добавлено</th>
             <th data-sortable="false" data-searchable="false">Действие</th>
@@ -40,7 +48,8 @@
           {% set text = entry.sample %}
           {% set truncated = text[:240] %}
           <tr>
-            <td><code>{{ entry.hash }}</code></td>
+            <td><code>{{ entry.id }}</code></td>
+            <td>{{ entry.author_id }}</td>
             <td class="value-preview">
               <pre>{{ truncated }}</pre>
               {% if text|length > 240 %}
@@ -50,7 +59,7 @@
             <td>{{ entry.created_at }}</td>
             <td>
               <form method="post" action="/cache/unignore">
-                <input type="hidden" name="hash" value="{{ entry.hash }}">
+                <input type="hidden" name="id" value="{{ entry.id }}">
                 <button type="submit" class="button button-small">Удалить</button>
               </form>
             </td>
@@ -84,7 +93,6 @@
               <th>Ключ</th>
               <th>Фрагмент значения</th>
               <th>Истечёт через</th>
-              <th>Истечёт в</th>
               {% if cache.allow_block %}
                 <th data-sortable="false" data-searchable="false">Игнор</th>
               {% endif %}
@@ -100,24 +108,26 @@
                 {% endif %}
               </td>
               <td class="value-preview">
-                {% set value = entry.value %}
-                {% if value is string %}
-                  {% set truncated = value[:240] %}
+                {% set display = entry.raw_value if entry.raw_value is not none else entry.value %}
+                {% if display is string %}
+                  {% set truncated = display[:240] %}
                   <pre>{{ truncated }}</pre>
-                  {% if value|length > 240 %}
-                    <div class="value-more">… ({{ value|length }} символов)</div>
+                  {% if display|length > 240 %}
+                    <div class="value-more">… ({{ display|length }} символов)</div>
                   {% endif %}
                 {% else %}
-                  <pre>{{ value }}</pre>
+                  <pre>{{ display }}</pre>
                 {% endif %}
               </td>
               <td>{{ entry.expires_in_human }}</td>
-              <td>{{ entry.expires_at }}</td>
               {% if cache.allow_block %}
                 <td>
                   {% if entry.raw_value %}
                     <form method="post" action="/cache/ignore">
                       <textarea name="text" hidden>{{ entry.raw_value }}</textarea>
+                      {% if entry.author_id %}
+                        <input type="hidden" name="author_id" value="{{ entry.author_id }}">
+                      {% endif %}
                       <button type="submit" class="button button-small">Игнорировать</button>
                     </form>
                   {% else %}

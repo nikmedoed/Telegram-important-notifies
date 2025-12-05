@@ -10,14 +10,18 @@ from telethon.tl import types
 
 from service.cache import Cache
 from service.db import db
+from service.ignore_matcher import IgnoreMatcher
 from service.search_engine import find_queries
 from service.text_cleaner import clean_text
-from service.utils import get_chat_name, get_message_source_link
+from service.utils import get_chat_name, get_message_source_link, sorted_tokens
 from service.telegram_client import client, TARGET_USER
 
 message_mutex = asyncio.Lock()
+# Exact hash cache: skips identical messages seen in the recent window.
+duplicate_cache = Cache(60 * 15, max_items=5000)
+# Similarity cache: compares sorted tokens for near-duplicates.
 advanced_duplicate_cache = Cache(60 * 15)
-duplicate_cache = Cache(60 * 60 * 12, max_items=5000)
+ignore_matcher = IgnoreMatcher(db)
 
 
 async def handle_new_message(event: events.newmessage.NewMessage.Event, forward_func=None):
@@ -77,34 +81,35 @@ async def process_message(event, forward_func, message, ctx, messages_count):
         return None
     trep = text.replace('\n', '|')
     skip_info = f"{mess_info} :: {trep}"
-
-    sender_id = message.sender_id if message.sender_id else message.chat_id
-    cache_key = f"{sender_id}_{messages_count}"
-
     message_hash = hashlib.sha256(text.encode()).hexdigest()
-    if db.is_message_blocked(message_hash):
-        logging.info(f"Blocked message skipped :: {skip_info}")
-        return None
-
     previous_messages_count = duplicate_cache.get(message_hash)
-    duplicate_cache.set(message_hash, messages_count)
-
-    previous_message = advanced_duplicate_cache.get(cache_key)
-    previous_message_length = len(previous_message) if previous_message else 0
-    advanced_duplicate_cache.set(cache_key, text)
-
+    duplicate_cache.set(message_hash, True)
     if previous_messages_count:
         logging.info(f"Duplicate skipped mc {messages_count} :: {skip_info}")
         return None
 
+    token_sorted = sorted_tokens(text)
+    prepared_text = {"token_sorted": token_sorted, "length": len(token_sorted), "raw": text}
+
+    sender_id = message.sender_id if message.sender_id else message.chat_id
+    cache_key = f"{sender_id}_{messages_count}"
+
+    previous_message = advanced_duplicate_cache.get(cache_key)
+    previous_message_length = previous_message["length"] if previous_message else 0
+    advanced_duplicate_cache.set(cache_key, prepared_text)
+
     if previous_message_length:
-        length_difference = abs(previous_message_length - len(text))
+        length_difference = abs(previous_message_length - prepared_text["length"])
         percentage_difference = 100 * length_difference / previous_message_length
         if percentage_difference <= 10 and previous_message:
-            similarity = fuzz.token_sort_ratio(text, previous_message)
+            similarity = fuzz.ratio(prepared_text["token_sorted"], previous_message["token_sorted"])
             if similarity > 93:
                 logging.info(f"Duplicate by similarity ({similarity:.1f}) :: {skip_info}")
                 return None
+
+    if ignore_matcher.check(prepared_text, message_hash, sender_id):
+        logging.info(f"Blocked by fuzzy ignore :: {skip_info}")
+        return None
 
     res = find_queries(ctx, text)
     if not res:

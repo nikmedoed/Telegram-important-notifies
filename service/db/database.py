@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import threading
 from collections import defaultdict
-from importlib import resources
 from pathlib import Path
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
 from service.bootstrap import bootstrap_from_legacy_files
 from service.config import data_directory
+from .migrations import run_migrations
 from .models import (
+    BlockedMessageEntry,
     ChannelGroupRecord,
     ChannelRecord,
     QueryRecord,
@@ -17,6 +19,7 @@ from .models import (
     ChannelSearchContext,
 )
 from .sql import *
+from ..utils import sorted_tokens
 
 
 class Database:
@@ -32,13 +35,12 @@ class Database:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL;")
             self._conn.execute("PRAGMA foreign_keys=ON;")
-        self._ensure_schema()
-        self._apply_migrations()
+        run_migrations(self._conn, self._lock, self._db_dir)
         self._bootstrap_from_legacy_files()
         self._query_entries: Dict[int, QuerySearchEntry] = {}
         self._channel_search_ctx: Dict[int, ChannelSearchContext] = {}
         self._reload_assignment_cache()
-        self._blocked_hashes: Set[str] = set()
+        self._blocked_entries: List[BlockedMessageEntry] = []
         self._reload_blocked_messages_cache()
 
     # region helpers -----------------------------------------------------
@@ -75,106 +77,10 @@ class Database:
                 continue
         return sorted(collected)
 
-    # region schema + migrations ----------------------------------------
-    def _ensure_schema(self) -> None:
-        schema_resource = resources.files("service.db").joinpath("schema.sql")
-        schema_copy = self._db_dir / "schema.sql"
-        if schema_copy.exists():
-            try:
-                schema_sql = schema_copy.read_text(encoding="utf-8")
-            except OSError:
-                schema_sql = schema_resource.read_text(encoding="utf-8")
-        else:
-            schema_sql = schema_resource.read_text(encoding="utf-8")
-            try:
-                schema_copy.write_text(schema_sql, encoding="utf-8")
-            except OSError:
-                pass
-        with self._lock:
-            self._conn.executescript(schema_sql)
-            self._conn.commit()
-
+    # region bootstrap --------------------------------------------------
     def _bootstrap_from_legacy_files(self) -> None:
         with self._lock:
             bootstrap_from_legacy_files(self._conn, data_directory)
-
-    def _apply_migrations(self) -> None:
-        if self._column_exists("channels", "last_seen"):
-            self._remove_last_seen_column()
-        if self._channel_relationships_reference_legacy_channels():
-            self._refresh_channel_relationship_tables()
-        if not self._table_exists("blocked_messages"):
-            self._create_blocked_messages_table()
-
-    def _column_exists(self, table: str, column: str) -> bool:
-        rows = self._fetchall(f"PRAGMA table_info({table})")
-        return any(row["name"] == column for row in rows)
-
-    def _table_exists(self, table: str) -> bool:
-        row = self._fetchone(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-            (table,),
-        )
-        return bool(row)
-
-    def _channel_relationships_reference_legacy_channels(self) -> bool:
-        def _references_legacy(table: str) -> bool:
-            if not self._table_exists(table):
-                return False
-            rows = self._fetchall(f"PRAGMA foreign_key_list({table})")
-            return any(row["table"] == "legacy_channels" for row in rows)
-
-        return any(
-            _references_legacy(table)
-            for table in ("channel_queries", "channel_group_members")
-        )
-
-    def _refresh_channel_relationship_tables(self, foreign_keys_disabled: bool = False) -> None:
-        with self._lock:
-            if not foreign_keys_disabled:
-                self._conn.execute("PRAGMA foreign_keys=OFF;")
-            try:
-                if self._table_exists("channel_queries"):
-                    self._conn.execute("ALTER TABLE channel_queries RENAME TO legacy_channel_queries")
-                    self._conn.execute(SQL_CREATE_CHANNEL_QUERIES_TABLE)
-                    self._conn.execute(SQL_COPY_CHANNEL_QUERIES_FROM_LEGACY)
-                    self._conn.execute("DROP TABLE legacy_channel_queries")
-
-                if self._table_exists("channel_group_members"):
-                    self._conn.execute("ALTER TABLE channel_group_members RENAME TO legacy_channel_group_members")
-                    self._conn.execute(SQL_CREATE_CHANNEL_GROUP_MEMBERS_TABLE)
-                    self._conn.execute(SQL_COPY_GROUP_MEMBERS_FROM_LEGACY)
-                    self._conn.execute("DROP TABLE legacy_channel_group_members")
-            finally:
-                if not foreign_keys_disabled:
-                    self._conn.execute("PRAGMA foreign_keys=ON;")
-                self._conn.commit()
-
-    def _create_blocked_messages_table(self) -> None:
-        with self._lock:
-            self._conn.execute(
-                """
-                CREATE TABLE IF NOT EXISTS blocked_messages (
-                    hash TEXT PRIMARY KEY,
-                    sample TEXT NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-            self._conn.commit()
-
-    def _remove_last_seen_column(self) -> None:
-        with self._lock:
-            self._conn.execute("PRAGMA foreign_keys=OFF;")
-            try:
-                self._conn.execute("ALTER TABLE channels RENAME TO legacy_channels")
-                self._conn.execute(SQL_CREATE_CHANNELS_TABLE)
-                self._conn.execute(SQL_COPY_CHANNELS_FROM_LEGACY)
-                self._refresh_channel_relationship_tables(foreign_keys_disabled=True)
-                self._conn.execute("DROP TABLE legacy_channels")
-            finally:
-                self._conn.execute("PRAGMA foreign_keys=ON;")
-                self._conn.commit()
 
     # region query operations -------------------------------------------
     def list_queries(self) -> List[QueryRecord]:
@@ -422,54 +328,129 @@ class Database:
             )
         self._reload_assignment_cache()
 
-    # region metadata + cache -------------------------------------------
-    def set_metadata(self, key: str, value: str) -> None:
-        self._execute(
-            "INSERT INTO metadata(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-            (key, value),
-        )
-
-    def get_metadata(self, key: str) -> str | None:
-        row = self._fetchone("SELECT value FROM metadata WHERE key = ?", (key,))
-        return row["value"] if row else None
-
     # region blocked messages ------------------------------------------
     def _reload_blocked_messages_cache(self) -> None:
-        rows = self._fetchall("SELECT hash FROM blocked_messages")
-        self._blocked_hashes = {row["hash"] for row in rows}
+        rows = self._fetchall("SELECT id, sample, author_id FROM blocked_messages WHERE author_id IS NOT NULL")
+        entries: List[BlockedMessageEntry] = []
+        for row in rows:
+            sample = row["sample"] or ""
+            token_sorted = sorted_tokens(sample)
+            entry = BlockedMessageEntry(
+                id=row["id"],
+                author_id=row["author_id"],
+                hash=hashlib.sha256(sample.encode()).hexdigest(),
+                token_sorted=token_sorted,
+                length=len(token_sorted),
+            )
+            entries.append(entry)
+        self._blocked_entries = entries
 
-    def is_message_blocked(self, message_hash: str) -> bool:
-        return message_hash in self._blocked_hashes
-
-    def add_blocked_message(self, message_hash: str, sample: str) -> bool:
+    def add_blocked_message(self, sample: str, author_id: int | None = None) -> tuple[bool, BlockedMessageEntry]:
         cleaned = (sample or "").strip()
         if not cleaned:
             raise ValueError("Нельзя заблокировать пустой текст")
+        if author_id is None:
+            raise ValueError("author_id обязателен для игнора")
         truncated = cleaned[:2048]
-        cur = self._execute(
-            """
-            INSERT INTO blocked_messages (hash, sample)
-            VALUES (?, ?)
-            ON CONFLICT(hash) DO NOTHING
-            """,
-            (message_hash, truncated),
+        row = self._fetchone("SELECT id FROM blocked_messages WHERE author_id = ?", (author_id,))
+        created = False
+        if row:
+            entry_id = row["id"]
+            self._execute("UPDATE blocked_messages SET sample = ? WHERE id = ?", (truncated, entry_id))
+        else:
+            cur = self._execute(
+                "INSERT INTO blocked_messages (sample, author_id) VALUES (?, ?)",
+                (truncated, author_id),
+            )
+            entry_id = int(cur.lastrowid)
+            created = True
+        token_sorted = sorted_tokens(truncated)
+        entry = BlockedMessageEntry(
+            id=entry_id,
+            author_id=author_id,
+            hash=hashlib.sha256(truncated.encode()).hexdigest(),
+            token_sorted=token_sorted,
+            length=len(token_sorted),
         )
-        created = cur.rowcount > 0
-        if created:
-            self._blocked_hashes.add(message_hash)
-        return created
+        # refresh in-memory cache incrementally
+        self._blocked_entries = [e for e in self._blocked_entries if e.author_id != author_id]
+        self._blocked_entries.append(entry)
+        return created, entry
 
-    def remove_blocked_message(self, message_hash: str) -> bool:
-        cur = self._execute("DELETE FROM blocked_messages WHERE hash = ?", (message_hash,))
-        removed = cur.rowcount > 0
-        if removed:
-            self._blocked_hashes.discard(message_hash)
-        return removed
+    def remove_blocked_message(self, entry_id: int) -> BlockedMessageEntry | None:
+        row = self._fetchone("SELECT id, sample, author_id FROM blocked_messages WHERE id = ?", (entry_id,))
+        if not row:
+            return None
+        self._execute("DELETE FROM blocked_messages WHERE id = ?", (entry_id,))
+        self._blocked_entries = [e for e in self._blocked_entries if e.id != entry_id]
+        sample = row["sample"] or ""
+        tokens = sorted_tokens(sample)
+        return BlockedMessageEntry(
+            id=row["id"],
+            author_id=row["author_id"],
+            hash=hashlib.sha256(sample.encode()).hexdigest(),
+            token_sorted=tokens,
+            length=len(tokens),
+        )
+
+    def update_blocked_message(
+            self,
+            entry_id: int,
+            *,
+            sample: str | None = None,
+            author_id: int | None = None,
+    ) -> None:
+        updates = []
+        params: list = []
+        new_sample = None
+        if sample is not None:
+            cleaned = sample.strip()
+            if cleaned:
+                updates.append("sample = ?")
+                params.append(cleaned[:2048])
+                new_sample = cleaned[:2048]
+            else:
+                new_sample = None
+        if author_id is not None:
+            updates.append("author_id = ?")
+            params.append(author_id)
+        if not updates:
+            return
+        params.append(entry_id)
+        self._execute(f"UPDATE blocked_messages SET {', '.join(updates)} WHERE id = ?", tuple(params))
+        # Update in-memory cache incrementally.
+        updated_entries: list[BlockedMessageEntry] = []
+        for entry in self._blocked_entries:
+            if entry.id != entry_id:
+                updated_entries.append(entry)
+                continue
+            if sample is not None and new_sample:
+                tokens = sorted_tokens(new_sample)
+                updated_entries.append(
+                    BlockedMessageEntry(
+                        id=entry.id,
+                        author_id=author_id if author_id is not None else entry.author_id,
+                        hash=hashlib.sha256(new_sample.encode()).hexdigest(),
+                        token_sorted=tokens,
+                        length=len(tokens),
+                    )
+                )
+            else:
+                updated_entries.append(
+                    BlockedMessageEntry(
+                        id=entry.id,
+                        author_id=author_id if author_id is not None else entry.author_id,
+                        hash=entry.hash,
+                        token_sorted=entry.token_sorted,
+                        length=entry.length,
+                    )
+                )
+        self._blocked_entries = updated_entries
 
     def list_blocked_messages(self, limit: int = 100) -> List[Dict[str, str]]:
         rows = self._fetchall(
             """
-            SELECT hash, sample, created_at
+            SELECT id, sample, author_id, created_at
             FROM blocked_messages
             ORDER BY created_at DESC
             LIMIT ?
@@ -477,9 +458,17 @@ class Database:
             (max(1, limit),),
         )
         return [
-            {"hash": row["hash"], "sample": row["sample"], "created_at": row["created_at"]}
+            {
+                "id": row["id"],
+                "sample": row["sample"],
+                "author_id": row["author_id"],
+                "created_at": row["created_at"],
+            }
             for row in rows
         ]
+
+    def get_blocked_entries(self) -> Tuple[BlockedMessageEntry, ...]:
+        return tuple(self._blocked_entries)
 
     def _reload_assignment_cache(self) -> None:
         from service import search_engine as se  # local import to avoid circular dependency during module load

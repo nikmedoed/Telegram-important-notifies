@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS metadata (
 );
 
 CREATE TABLE IF NOT EXISTS blocked_messages (
-    hash TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     sample TEXT NOT NULL,
+    author_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
 );

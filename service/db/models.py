@@ -51,3 +51,12 @@ class ChannelSearchContext:
     idf_map: dict[str, float]
     tfidf_map: dict[int, tuple[tuple[dict[str, float], float], ...]]
     entries_map: dict[int, QuerySearchEntry]
+
+
+@dataclass(frozen=True, slots=True)
+class BlockedMessageEntry:
+    id: int
+    author_id: int | None
+    hash: str
+    token_sorted: str
+    length: int

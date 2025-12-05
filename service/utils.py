@@ -3,7 +3,6 @@ import traceback
 
 from telethon.tl import types
 
-from service.db import db
 from service.telegram_client import client
 
 
@@ -77,8 +76,14 @@ async def get_chat_name(message):
     if title:
         return title
 
+    from service.db import db  # lazy import to avoid circular dependency
+
     channel = db.get_channel(message.chat_id)
     if channel and channel.title:
         return channel.title
 
     return "Unknown"
+
+
+def sorted_tokens(text: str) -> str:
+    return " ".join(sorted((text or "").split()))
