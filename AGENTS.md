@@ -1,39 +1,38 @@
 # AGENTS
 
-Краткие ориентиры для agenta/оператора по работе с проектом.
+Quick guide for the agent/operator working with the project.
 
-## Что делает сервис
-- Мониторит Telegram‑каналы/чаты, ищет сообщения по пользовательским запросам (1–3 слова, иногда больше), пересылает совпадения целевому пользователю.
-- Запросы могут состоять из нескольких независимых частей (через запятую), возможны обязательные слова с префиксом `+`.
-- Работает на слабом железе (ARM Cortex‑A7 ~1.3 GHz, 512 MB RAM); приоритет — малое потребление памяти, быстрота поиска.
+## What the service does
+- Monitors Telegram channels/chats, searches for messages using user queries (1–3 words, sometimes more), and forwards matches to the target user.
+- Queries may consist of multiple independent clauses (comma separated); mandatory words are prefixed with `+`.
+- Runs on weak hardware (ARM Cortex-A7 ~1.3 GHz, 512 MB RAM); priority is low memory usage and fast search.
 
-## Основные модули
-- `service/search_engine.py` — токенизация, fuzzy‑/tf‑idf поиск по окнам предложений, поддержка независимых клауз и `+`‑обязательных токенов.
-- `service/db/database.py` + `service/db/models.py` — SQLite, кеши поисковых данных (`QuerySearchEntry`, `ChannelSearchContext`), `slots=True` и tuple для экономии RAM.
-- `service/main_handler.py` — обработка входящих сообщений, дедупликация, вызов поиска, пересылка результатов.
-- `service/telegram_client.py` — инициализация Telethon‑клиента (вынесено из config для уменьшения импорта).
-- `service/cache.py` — TTL‑кеш с опциональным `max_items` и фоновым очистителем.
+## Core modules
+- `service/search_engine.py` — tokenization, fuzzy/tf-idf search over sentence windows, supports independent clauses and `+` mandatory tokens.
+- `service/db/database.py` + `service/db/models.py` — SQLite, caches of search data (`QuerySearchEntry`, `ChannelSearchContext`), `slots=True` and tuples to save RAM.
+- `service/main_handler.py` — processes incoming messages, deduplicates, invokes search, forwards results.
+- `service/telegram_client.py` — Telethon client initialization (split from config to reduce imports).
+- `service/cache.py` — TTL cache with optional `max_items` and a background cleaner.
 
-## Как работает поиск (коротко)
-- Токенизация/лемматизация с кешированием (`Cache`), стоп‑слова отсекаются, используется `rapidfuzz` для сравнения токенов.
-- Без жёсткого порядка слов: матч bag‑of‑tokens с ограничением «один текстовый токен → максимум один запросный токен», штраф за разброс (компактность окна).
-- Быстрый путь: если все запросные токены встретились подряд в любом порядке — скор 100.
-- TF‑IDF второй сигнал: на основе токенов запросов строится IDF, косинусное сходство усиливает результат для редких слов.
-- Запросы заранее парсятся в клаузы (части через запятую). Каждая клаузa ищется отдельно; итоговый скор — минимум по клаузаm (все должны совпасть).
-- `+word` делает токен обязательным в клаузе; без него окно сразу отсекается.
+## How the search works (short version)
+- Tokenization/lemmatization with caching (`Cache`), stop words filtered out, `rapidfuzz` used for token comparison.
+- No strict word order: bag-of-tokens match with a constraint “one text token → max one query token”, penalty for dispersion (window compactness).
+- Fast path: if all query tokens appear consecutively in any order, score = 100.
+- TF-IDF is the second signal: build IDF from query tokens, cosine similarity boosts rare words.
+- Queries are parsed into clauses ahead of time (comma separated). Each clause is searched independently; final score is the minimum across clauses (all must match).
+- `+word` marks a mandatory token in a clause; windows missing it are rejected immediately.
 
-## RAM/перфоманс установки
-- Токенизационный кеш: TTL 2 часа, `max_items=2000` — держит нормализованные токены текстов.
-- Дедуп‑кеши в `main_handler`: ограничены по элементам, чтобы не разрастались.
-- `dataclass(..., slots=True)` и `tuple` в моделях поиска снижают per‑object overhead.
-- Не запускать лишние тяжёлые фоновые задачи; писать на SD только если нужно (SQLite и кеши работают в памяти).
+## RAM/performance notes
+- Tokenization cache: TTL 2 hours, `max_items=2000` — keeps normalized text tokens.
+- Dedup caches in `main_handler` limited by item count to avoid growth.
+- `dataclass(..., slots=True)` and tuples in search models reduce per-object overhead.
+- Do not start heavy background jobs; write to SD only if necessary (SQLite and caches run in memory).
 
-## Типовой запуск/отладка
-- Требуются env: `TELEGRAM_APP_ID`, `TELEGRAM_API_HASH`, `TARGET_USER`, опционально сетевые таймауты (см. `service/config.py`).
-- Библиотеки: `telethon`, `rapidfuzz`, `nltk`, `pymorphy3`. Для тестов нужен `pytest`/`unittest` (в окружении может не стоять).
-- При старте база/кеши прогружают запросы, токенизируют их один раз и строят tf‑idf для каналов.
+## Typical run/debug setup
+- Required env vars: `TELEGRAM_APP_ID`, `TELEGRAM_API_HASH`, `TARGET_USER`, optional network timeouts (see `service/config.py`).
+- Libraries: `telethon`, `rapidfuzz`, `nltk`, `pymorphy3`. Tests need `pytest`/`unittest` (may be absent in the environment).
+- On startup the DB/caches load queries, tokenize them once, and build tf-idf for channels.
 
-## На что обращать внимание
-- Любые изменения в поиске — проверять, что порядок слов не обязателен, но компактность влияет на скор.
-- Если добавляется новая логика запросов, обновлять парсер в `parse_query_phrase` и модели `ClauseSpec`.
-
+## What to watch out for
+- Any search changes must respect word order independence while keeping compactness impact on score.
+- When adding new query logic, update the parser in `parse_query_phrase` and the `ClauseSpec` models.
