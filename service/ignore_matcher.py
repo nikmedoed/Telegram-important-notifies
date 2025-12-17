@@ -22,6 +22,8 @@ class IgnoreMatcher:
         if entry.author_id is None:
             return
         bucket = self._entries_by_author.setdefault(entry.author_id, [])
+        if any(existing["id"] == entry.id for existing in bucket):
+            return
         bucket.append(
             {
                 "id": entry.id,

@@ -3,7 +3,6 @@ from __future__ import annotations
 import threading
 from importlib import resources
 from pathlib import Path
-import hashlib
 
 from .sql import (
     SQL_COPY_CHANNEL_QUERIES_FROM_LEGACY,
@@ -152,12 +151,26 @@ def _migrate_blocked_messages_table(conn, lock: threading.RLock) -> None:
                 conn.commit()
 
 
-def _ensure_blocked_author_index(conn, lock: threading.RLock) -> None:
+def _ensure_blocked_messages_indexes(conn, lock: threading.RLock) -> None:
+    # Historical versions enforced 1 author -> 1 ignore sample via a UNIQUE index.
+    # We now allow multiple samples per author, but still keep an index for lookups.
+    rows = _exec(conn, lock, "PRAGMA index_list('blocked_messages')", commit=False).fetchall()
+    for row in rows:
+        if row["name"] != "idx_blocked_messages_author":
+            continue
+        try:
+            is_unique = bool(row["unique"])
+        except Exception:
+            is_unique = False
+        if is_unique:
+            _exec(conn, lock, "DROP INDEX IF EXISTS idx_blocked_messages_author")
+        break
+
     _exec(
         conn,
         lock,
         """
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_blocked_messages_author
+        CREATE INDEX IF NOT EXISTS idx_blocked_messages_author
             ON blocked_messages (author_id)
             WHERE author_id IS NOT NULL
         """,
@@ -192,7 +205,7 @@ def apply_migrations(conn, lock: threading.RLock) -> None:
         _create_blocked_messages_table(conn, lock)
     else:
         _migrate_blocked_messages_table(conn, lock)
-    _ensure_blocked_author_index(conn, lock)
+    _ensure_blocked_messages_indexes(conn, lock)
 
 
 def run_migrations(conn, lock: threading.RLock, db_dir: Path) -> None:

@@ -3,10 +3,10 @@ import traceback
 
 from telethon.tl import types
 
-from service.telegram_client import client
-
 
 async def get_message_source_link(message):
+    from service.telegram_client import client
+
     message_link = ""
     location_link = ""
     chat_entity = {}

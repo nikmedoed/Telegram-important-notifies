@@ -45,6 +45,34 @@ def _get_original_author_id(message) -> int | None:
     return getattr(message, "chat_id", None)
 
 
+async def _get_album_text(message) -> str | None:
+    """Return caption text from any message in the same album."""
+    grouped_id = getattr(message, "grouped_id", None)
+    if not grouped_id:
+        return None
+
+    try:
+        ids = list(range(max(1, message.id - 10), message.id + 11))
+        messages = await client.get_messages(message.chat_id or message.peer_id, ids=ids)
+    except Exception:
+        logging.warning("Failed to fetch album messages for ignore lookup", exc_info=True)
+        return None
+
+    parts = []
+    for msg in messages:
+        if not msg or getattr(msg, "grouped_id", None) != grouped_id:
+            continue
+        if msg.text:
+            parts.append(msg.text)
+
+    if not parts:
+        return None
+
+    combined = "\n".join(parts)
+    logging.debug("Album text collected for ignore: %s", combined[:200])
+    return combined
+
+
 async def handle_control_message(event: events.newmessage.NewMessage.Event) -> None:
     """Process commands in the private chat with TARGET_USER."""
     message = getattr(event, "message", event)
@@ -55,10 +83,13 @@ async def handle_control_message(event: events.newmessage.NewMessage.Event) -> N
     if not reply:
         await message.reply("Ответьте 'нет' на пересланное сообщение, чтобы добавить его в игнор.")
         return
-    if not reply.text:
+    source_text = reply.text
+    if not source_text:
+        source_text = await _get_album_text(reply)
+    if not source_text:
         await message.reply("В исходном сообщении нет текста — игнор не сохранен.")
         return
-    normalized = clean_text(reply.text).lower()
+    normalized = clean_text(source_text).lower()
     if not normalized:
         await message.reply("После очистки текста ничего не осталось, игнор не сохранен.")
         return
@@ -72,7 +103,7 @@ async def handle_control_message(event: events.newmessage.NewMessage.Event) -> N
     except ValueError as exc:
         await message.reply(str(exc))
         return
-    feedback = "Добавлено в игнор" if created else "Правило обновлено"
+    feedback = "Добавлено в игнор" if created else "Уже есть правило игнора"
     await message.reply(f"{feedback} для автора {author_id}")
     logging.info("Ignore via reply :: author %s :: %s", author_id, normalized[:64])
 
@@ -179,8 +210,16 @@ async def process_message(event, forward_func, message, ctx, messages_count):
         f"<a href='{html.escape(message_link)}'>Сообщение</a>"
     )
     async with message_mutex:
-        forwarded = await event.forward_to(TARGET_USER) if not forward_func else await forward_func()
+        forwarded = None
+        try:
+            forwarded = await event.forward_to(TARGET_USER) if not forward_func else await forward_func()
+        except Exception:
+            logging.warning("Forwarding failed; sending info without forward", exc_info=True)
         if isinstance(forwarded, list):
-            forwarded = forwarded[0]
-        await forwarded.reply(infomes)
+            forwarded = forwarded[0] if forwarded else None
+        if forwarded:
+            await forwarded.reply(infomes)
+        else:
+            # Fallback: deliver the match info even if forwarding failed or returned nothing.
+            await client.send_message(TARGET_USER, infomes)
     logging.info(f"👀 {mess_info} :: {res} :: {trep[:64]}...")

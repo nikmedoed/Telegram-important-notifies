@@ -21,7 +21,7 @@ Quick reference for engineers operating the Telegram important notifications ser
   - `QuerySearchEntry` and `ChannelSearchContext` built from the latest channel-query assignments (stored again whenever queries/channels change).
   - Blocked messages cache keyed by `author_id`, supplying `IgnoreMatcher`.
   - Channel groups, memberships, query assignments for bulk operations in the web UI.
-- `service/ignore_matcher.py` — Author-scoped fuzzy ignore list. Messages can be added by replying “нет” to a forwarded message (handled in `handle_control_message`) or via the `/cache` web form.
+- `service/ignore_matcher.py` — Author-scoped fuzzy ignore list. Messages can be added by replying “нет” to a forwarded message (handled in `handle_control_message`) or via the `/cache` web form; each author can have multiple ignore samples (new “нет” adds another sample, duplicates are ignored).
 - `service/process_history.py` — Walks unread history for tracked chats, batching grouped media before replaying them through the regular handler path.
 - `service/channel_sync.py` & `service/channel_updates.py` — Pull current dialogs (respecting invite links/usernames when possible), classify kind (`chat`, `supergroup`, `channel`, etc.), and keep the `channels` table up-to-date. The web UI exposes `/channels/refresh` to run the sync.
 - `service/web` — aiohttp + Jinja2 admin console:

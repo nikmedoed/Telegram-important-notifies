@@ -120,7 +120,7 @@ async def ignore_message(request: web.Request) -> web.Response:
     except ValueError as exc:
         _redirect("/cache", str(exc))
     else:
-        feedback = "Сообщение занесено в игнор-лист" if created else "Правило обновлено"
+        feedback = "Сообщение занесено в игнор-лист" if created else "Такое правило уже есть"
         _redirect("/cache", feedback)
 
 

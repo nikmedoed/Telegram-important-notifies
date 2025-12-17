@@ -352,16 +352,16 @@ class Database:
         if author_id is None:
             raise ValueError("author_id обязателен для игнора")
         truncated = cleaned[:2048]
-        row = self._fetchone("SELECT id FROM blocked_messages WHERE author_id = ?", (author_id,))
+        row = self._fetchone(
+            "SELECT id, sample FROM blocked_messages WHERE author_id = ? AND sample = ?",
+            (author_id, truncated),
+        )
         created = False
         if row:
-            entry_id = row["id"]
-            self._execute("UPDATE blocked_messages SET sample = ? WHERE id = ?", (truncated, entry_id))
+            entry_id = int(row["id"])
+            truncated = row["sample"] or truncated
         else:
-            cur = self._execute(
-                "INSERT INTO blocked_messages (sample, author_id) VALUES (?, ?)",
-                (truncated, author_id),
-            )
+            cur = self._execute("INSERT INTO blocked_messages (sample, author_id) VALUES (?, ?)", (truncated, author_id))
             entry_id = int(cur.lastrowid)
             created = True
         token_sorted = sorted_tokens(truncated)
@@ -373,8 +373,8 @@ class Database:
             length=len(token_sorted),
         )
         # refresh in-memory cache incrementally
-        self._blocked_entries = [e for e in self._blocked_entries if e.author_id != author_id]
-        self._blocked_entries.append(entry)
+        if not any(e.id == entry_id for e in self._blocked_entries):
+            self._blocked_entries.append(entry)
         return created, entry
 
     def remove_blocked_message(self, entry_id: int) -> BlockedMessageEntry | None:
