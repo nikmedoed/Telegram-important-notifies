@@ -25,8 +25,15 @@ advanced_duplicate_cache = Cache(60 * 15)
 ignore_matcher = IgnoreMatcher(db)
 
 
-def _get_original_author_id(message) -> int | None:
-    """Prefer original sender/channel from forwarded metadata."""
+def _get_message_author_id(message) -> int | None:
+    """Author key used during runtime processing."""
+    if getattr(message, "sender_id", None):
+        return message.sender_id
+    return getattr(message, "chat_id", None)
+
+
+async def _resolve_ignore_author_id(message) -> int | None:
+    """Resolve original author for ignore rules from forwarded metadata."""
     fwd = getattr(message, "fwd_from", None)
     if fwd:
         if getattr(fwd, "from_id", None):
@@ -34,15 +41,47 @@ def _get_original_author_id(message) -> int | None:
                 return get_peer_id(fwd.from_id)
             except Exception:
                 pass
+        saved_from_peer = getattr(fwd, "saved_from_peer", None)
+        saved_from_msg_id = getattr(fwd, "saved_from_msg_id", None)
+        # For forwarded messages where from_id is hidden, recover the original
+        # message from source chat to keep ignore scoped to the real sender.
+        if saved_from_peer and saved_from_msg_id:
+            try:
+                original = await client.get_messages(saved_from_peer, ids=saved_from_msg_id)
+                if original:
+                    recovered = _get_message_author_id(original)
+                    if recovered is not None:
+                        return recovered
+            except Exception:
+                logging.debug("Failed to resolve forwarded source author", exc_info=True)
         if getattr(fwd, "saved_from_peer", None):
             try:
                 return get_peer_id(fwd.saved_from_peer)
             except Exception:
                 pass
-    # Fallbacks: sender_id for chats, or chat_id as last resort.
-    if getattr(message, "sender_id", None):
-        return message.sender_id
-    return getattr(message, "chat_id", None)
+    return _get_message_author_id(message)
+
+
+async def _resolve_ignore_source_message(reply):
+    """
+    Resolve the actual source message for 'нет':
+    user may reply either to forwarded content or to the service summary.
+    """
+    try:
+        nested = await reply.get_reply_message()
+    except Exception:
+        logging.debug("Failed to resolve nested reply for ignore", exc_info=True)
+        return reply
+    if not nested:
+        return reply
+    if getattr(reply, "fwd_from", None):
+        return reply
+    if getattr(nested, "fwd_from", None):
+        return nested
+    text = clean_text(getattr(reply, "text", None)).lower()
+    if "сработало условие" in text:
+        return nested
+    return reply
 
 
 async def _get_album_text(message) -> str | None:
@@ -83,9 +122,10 @@ async def handle_control_message(event: events.newmessage.NewMessage.Event) -> N
     if not reply:
         await message.reply("Ответьте 'нет' на пересланное сообщение, чтобы добавить его в игнор.")
         return
-    source_text = reply.text
+    source_message = await _resolve_ignore_source_message(reply)
+    source_text = source_message.text
     if not source_text:
-        source_text = await _get_album_text(reply)
+        source_text = await _get_album_text(source_message)
     if not source_text:
         await message.reply("В исходном сообщении нет текста — игнор не сохранен.")
         return
@@ -93,7 +133,7 @@ async def handle_control_message(event: events.newmessage.NewMessage.Event) -> N
     if not normalized:
         await message.reply("После очистки текста ничего не осталось, игнор не сохранен.")
         return
-    author_id = _get_original_author_id(reply)
+    author_id = await _resolve_ignore_author_id(source_message)
     if author_id is None:
         await message.reply("Не удалось определить автора, игнор не сохранен.")
         return
@@ -175,7 +215,7 @@ async def process_message(event, forward_func, message, ctx, messages_count):
     token_sorted = sorted_tokens(text)
     prepared_text = {"token_sorted": token_sorted, "length": len(token_sorted), "raw": text}
 
-    sender_id = message.sender_id if message.sender_id else message.chat_id
+    sender_id = _get_message_author_id(message)
     cache_key = f"{sender_id}_{messages_count}"
 
     previous_message = advanced_duplicate_cache.get(cache_key)
@@ -191,7 +231,7 @@ async def process_message(event, forward_func, message, ctx, messages_count):
                 logging.info(f"Duplicate by similarity ({similarity:.1f}) :: {skip_info}")
                 return None
 
-    if ignore_matcher.check(prepared_text, message_hash, sender_id):
+    if sender_id is not None and ignore_matcher.check(prepared_text, message_hash, sender_id):
         logging.info(f"Blocked by fuzzy ignore :: {skip_info}")
         return None
 
